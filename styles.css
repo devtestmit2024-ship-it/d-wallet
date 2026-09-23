@@ -2,6 +2,9 @@
 
 /* 📌 ป้องกันการซูมหน้าจอทุกกรณี */
 html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior-y: none;
@@ -30,13 +33,13 @@ button, input, select, textarea, a {
 }
 
 :root {
-  --green: #076749;
-  --deep: #064532;
-  --mint: #e8f5ee;
-  --ink: #14382d;
-  --muted: #6d8079;
-  --line: #e1ebe5;
-  --gold: #f5c765;
+  --green: #256b45;
+  --deep: #194832;
+  --mint: #e8efe4;
+  --ink: #2c241d;
+  --muted: #766b5e;
+  --line: #e2d8cb;
+  --gold: #d6a64d;
 }
 
 * {
@@ -45,10 +48,10 @@ button, input, select, textarea, a {
 
 body {
   margin: 0;
-  background: #f5f8f6;
+  background: linear-gradient(160deg, #efe5d7 0%, #e3cdb1 48%, #d4b08a 100%);
   color: var(--ink);
   font-family: 'Noto Sans Thai', system-ui, sans-serif;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 button, input {
@@ -61,10 +64,11 @@ button {
 }
 
 #app {
+  width: 100%;
   max-width: 520px;
   margin: auto;
-  min-height: 100vh;
-  background: #fff;
+  min-height: 100dvh;
+  background: rgba(255, 250, 244, .86);
 }
 
 /* Safe Area Inset สำหรับการเปิดแบบ Shortcut / PWA / Web App */
@@ -73,7 +77,8 @@ button {
   padding-left: calc(22px + env(safe-area-inset-left, 0px));
   padding-right: calc(22px + env(safe-area-inset-right, 0px));
   padding-bottom: calc(38px + env(safe-area-inset-bottom, 0px));
-  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -83,6 +88,7 @@ button {
   margin-bottom: 24px;
   position: relative;
   min-height: 42px;
+  max-width: 100%;
 }
 
 .topbar-login {
@@ -96,6 +102,7 @@ button {
   white-space: nowrap;
   flex: 1;
   justify-content: flex-start;
+  min-width: 0;
 }
 
 .topbar-brand img, .hero-logo {
@@ -122,6 +129,21 @@ button {
   align-items: center;
   position: relative;
   z-index: 1;
+}
+
+.history-action {
+  display: flex;
+  justify-content: center;
+  margin: 14px 0 18px;
+}
+
+.history-action .secondary {
+  width: auto;
+  margin: 0;
+  padding: 10px 18px;
+  background: #fffaf4;
+  border-color: #8f6544;
+  color: #704128;
 }
 
 .brand-mark, .back {
@@ -737,24 +759,15 @@ input:focus {
   }
 }
 
-.install-app {
-  width: 100%;
-  margin-top: 2px;
-  padding: 11px 12px;
-  border: 1px solid #b8d9c8;
-  border-radius: 13px;
-  background: #f1faf5;
-  color: var(--green);
-  font-weight: 700;
-  font-size: 13px;
-}
-
-.install-app span {
-  font-size: 18px;
-  line-height: 0;
-  vertical-align: -1px;
-}
-
-.install-app[hidden] {
-  display: none;
+@media (max-width: 420px) {
+  .shell {
+    padding-left: calc(16px + env(safe-area-inset-left, 0px));
+    padding-right: calc(16px + env(safe-area-inset-right, 0px));
+  }
+  .card, .product, input {
+    max-width: 100%;
+  }
+  .topbar-brand span {
+    font-size: 18px;
+  }
 }

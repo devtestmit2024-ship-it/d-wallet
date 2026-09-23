@@ -131,22 +131,9 @@ function renderAuth() {
     <label>รหัสผ่าน<input required name="password" type="password" minlength="4" placeholder="กรอกรหัสผ่าน" autocomplete="current-password"></label>
     <button class="primary" type="submit">เข้าสู่ระบบ <span>→</span></button>
     <p class="forgot-password"><button id="forgot-password" type="button">ลืมรหัสผ่าน?</button></p>
-    <button class="install-app" id="install-app" type="button"><span aria-hidden="true">↓</span> ติดตั้ง D Wallet บนหน้าจอหลัก</button>
   </form></div>`);
 
   document.querySelector('#forgot-password').onclick = renderForgotPassword;
-  const installButton = document.querySelector('#install-app');
-  const showInstallButton = () => { installButton.hidden = false; };
-  if (window.dwalletInstallAvailable) showInstallButton();
-  window.addEventListener('dwallet-install-available', showInstallButton, { once: true });
-  installButton.onclick = async () => {
-    const prompted = await window.promptDWalletInstall?.();
-    if (!prompted) showToast('หากไม่มีหน้าต่างติดตั้ง: เปิดเว็บผ่าน Chrome และเมนู ⋮ > “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”');
-  };
-  window.addEventListener('dwallet-installed', () => {
-    installButton.hidden = true;
-    showToast('ติดตั้ง D Wallet บนหน้าจอหลักแล้ว');
-  }, { once: true });
 
   document.querySelector('#auth-form').onsubmit = async e => {
     e.preventDefault(); 
@@ -271,16 +258,13 @@ async function renderProducts() {
     const allLimit = user.All_Limit ?? 50;
 
     const userInfoHtml = `
-      <div class="card user-info-card" style="margin-bottom: 1rem; padding: 1rem;">
+      <div class="card user-info-card" style="padding: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
           <div>
             <p><strong>ชื่อ:</strong> ${esc(user.name || user.Name || '-')}</p>
             <p><strong>เบอร์โทร:</strong> ${esc(userPhone || '-')}</p>
             <p><strong>บ้านเลขที่:</strong> ${esc(user.address || user.House_Number || '-')}</p>
           </div>
-          <button id="btn-history" type="button" class="secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 8px; cursor: pointer;">
-            📜 ประวัติการใช้สิทธิ์
-          </button>
         </div>
         <p style="margin-top: 0.5rem; color: #059669; font-weight: bold;">
           สิทธิ์ที่ใช้ไปแล้ว: ${usedCount}/${allLimit} แก้ว
@@ -288,6 +272,8 @@ async function renderProducts() {
         ${usedToday ? '<p style="margin-top: 0.25rem; color: #ef4444; font-size: 0.875rem; font-weight: bold;">⚠️ วันนี้ใช้สิทธิ์ไปแล้ว</p>' : ''}
       </div>
     `;
+
+    const historyActionHtml = `<div class="history-action"><button id="btn-history" type="button" class="secondary">📜 ประวัติการใช้สิทธิ์</button></div>`;
 
     const productListHtml = `
       <div class="product-list">
@@ -306,7 +292,7 @@ async function renderProducts() {
       </div>
     `;
 
-    layout(`<div class="page-title"><h2>เลือกรายการสินค้า</h2></div>${userInfoHtml}${productListHtml}`, false);
+    layout(`<div class="page-title"><h2>เลือกรายการสินค้า</h2></div>${userInfoHtml}${historyActionHtml}${productListHtml}`, false);
     
     document.querySelector('#btn-history')?.addEventListener('click', () => renderHistory());
 
