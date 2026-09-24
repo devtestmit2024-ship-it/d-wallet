@@ -1,8 +1,5 @@
-// api.js (ระบบพนักงานขาย - Supabase Integration)
+// api.js (ระบบลูกค้า - ปรับปรุงการตรวจสอบรหัสผ่านแรกเข้าและการสร้างเลขบิลตามวันที่)
 
-/**
- * ฟังก์ชันสร้าง/ดึง Client Instance ของ Supabase
- */
 function getSupabase() {
   if (!window.supabase || !window.supabase.createClient) {
     throw new Error('ระบบยังโหลด Supabase SDK ไม่สมบูรณ์ กรุณาลองใหม่อีกครั้ง');
@@ -13,391 +10,347 @@ function getSupabase() {
   return window._supabaseInstance;
 }
 
-/**
- * ฟังก์ชันทำความสะอาดข้อความ (Trim)
- */
 function cleanString(val) {
   return String(val || '').trim();
 }
 
-/**
- * แผนที่รายการสินค้า (Product Map)
- */
-const PRODUCT_MAP = {
-  '1': { name: 'แบล็คคอฟฟี (เย็น)', image: 'public/assets/image/black-coffee.webp' },
-  '2': { name: 'เอสเปรสโซ (เย็น)', image: 'public/assets/image/espresso.webp' },
-  '3': { name: 'ชานม (เย็น)', image: 'public/assets/image/tea-with-milk.webp' }
-};
+function getCurrentUserPhone() {
+  try {
+    const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (savedUser) {
+      const parsed = JSON.parse(savedUser);
+      return cleanString(parsed.phone || parsed.Phone_No);
+    }
+  } catch (e) {
+    console.warn('Cannot parse stored user:', e);
+  }
+  return '';
+}
 
-window.staffApi = {
-  /**
-   * ตรวจสอบสิทธิ์ก่อนเปิดหน้าจัดการสมาชิก
-   * User ใช้เบอร์โทรศัพท์ที่บันทึกใน Phone_No
-   */
-  async verifyAdminCredentials(username, password) {
+window.api = {
+  isDemo: false,
+
+  // 📌 ตรวจสอบการใช้สิทธิ์วันนี้
+  async checkTodayBillUsage(phone) {
     const supabase = getSupabase();
-    const user = cleanString(username);
-    const pass = String(password ?? '');
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) return false;
 
-    if (!user || !pass) throw new Error('กรุณากรอก User และ Password ให้ครบถ้วน');
-
-    const { data, error } = await supabase
+    const { data: user, error: userErr } = await supabase
       .from('Cafe_Amazon_Promosion_House')
-      .select('ID, Name, Phone_No, Access_Level')
-      .eq('Phone_No', user)
-      .eq('PassWord', pass)
-      .eq('Access_Level', 1)
+      .select('ID')
+      .eq('Phone_No', cleanPhone)
       .maybeSingle();
 
-    if (error) throw new Error(`ตรวจสอบสิทธิ์ไม่สำเร็จ: ${error.message}`);
-    if (!data) throw new Error('User หรือ Password ไม่ถูกต้อง หรือบัญชีนี้ไม่มีสิทธิ์แอดมิน');
+    if (userErr || !user) return false;
 
-    return { id: data.ID, name: data.Name, username: data.Phone_No, accessLevel: data.Access_Level };
-  },
-
-  /**
-   * 0. ฟังก์ชันเจนเลขบิลอัตโนมัติ (YYYYMMDD0001)
-   * เลขรัน 4 หลัก และรีเซ็ตเป็น 0001 เมื่อเป็นบิลแรกของวัน
-   */
-  async generateBillNo() {
-    const supabase = getSupabase();
     const now = new Date();
-    
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const datePrefix = `${yyyy}${mm}${dd}`; // เช่น 20260922
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
 
-    // ค้นหาบิลล่าสุดของวันนี้ในตาราง Cafe_Amazon_Bill
-    const { data, error } = await supabase
+    const startOfDay = `${year}-${month}-${day}T00:00:00.000+07:00`;
+    const endOfDay = `${year}-${month}-${day}T23:59:59.999+07:00`;
+
+    const { data: bill, error: billErr } = await supabase
       .from('Cafe_Amazon_Bill')
-      .select('Bill_No')
-      .like('Bill_No', `${datePrefix}%`)
-      .order('Bill_No', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .select('ID')
+      .eq('Cafe_Amazon_PK', user.ID)
+      .gte('InsertDate', startOfDay)
+      .lte('InsertDate', endOfDay)
+      .limit(1);
 
-    let nextSequence = 1;
-    if (data && data.Bill_No && data.Bill_No.length >= 12) {
-      // ดึงเลขรัน 4 หลักสุดท้ายมาแปลงเป็นตัวเลข
-      const lastSeqStr = data.Bill_No.substring(8, 12);
-      const lastSeqInt = parseInt(lastSeqStr, 10);
-      if (!isNaN(lastSeqInt)) {
-        nextSequence = lastSeqInt + 1;
-      }
-    }
-
-    const seqString = String(nextSequence).padStart(4, '0');
-    return `${datePrefix}${seqString}`;
+    if (billErr) return false;
+    return bill && bill.length > 0;
   },
 
-  // api.js (เฉพาะส่วน generateBillNo)
-
-/**
- * 0. ฟังก์ชันเจนเลขบิลอัตโนมัติ (YYYYMMDD0001)
- * เลขรัน 4 หลัก และรีเซ็ตเป็น 0001 เมื่อเป็นบิลแรกของวัน (ไม่มีตัวหนังสือ)
- */
-async generateBillNo() {
+  // 1. เข้าสู่ระบบ (เช็ก PassWord)
+  // ใน api.js ตรงฟังก์ชัน login
+async login({ phone, password }) {
   const supabase = getSupabase();
-  const now = new Date();
-  
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const datePrefix = `${yyyy}${mm}${dd}`; // เช่น 20260922
+  const cleanPhone = cleanString(phone);
 
-  // ค้นหาบิลล่าสุดของวันนี้ในตาราง Cafe_Amazon_Bill
-  const { data, error } = await supabase
-    .from('Cafe_Amazon_Bill')
-    .select('Bill_No')
-    .like('Bill_No', `${datePrefix}%`)
-    .order('Bill_No', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  let nextSequence = 1;
-  if (data && data.Bill_No && data.Bill_No.length === 12) {
-    // ดึงเลขรัน 4 หลักสุดท้ายมาแปลงเป็นตัวเลข
-    const lastSeqStr = data.Bill_No.substring(8, 12);
-    const lastSeqInt = parseInt(lastSeqStr, 10);
-    if (!isNaN(lastSeqInt)) {
-      nextSequence = lastSeqInt + 1;
-    }
-  }
-
-  const seqString = String(nextSequence).padStart(4, '0');
-  return `${datePrefix}${seqString}`;
-},
-  /**
-   * 1. ค้นหาและตรวจสอบข้อมูลสิทธิ์ก่อนทำรายการ
-   * @param {string} searchKey - เบอร์โทรศัพท์ หรือ รหัสคูปอง
-   */
-  // api.js (แก้ไข checkCouponInfo เพิ่มการดึง Project_ID)
-  async checkCouponInfo(searchKey) {
-  const supabase = getSupabase();
-  const cleanKey = cleanString(searchKey);
-
-  if (!cleanKey) throw new Error('ข้อมูลเบอร์โทรศัพท์หรือรหัสคูปองไม่ถูกต้อง');
-
-  // 1. เพิ่ม Project_ID ใน .select()
   const { data, error } = await supabase
     .from('Cafe_Amazon_Promosion_House')
-    .select('ID, Name, Phone_No, House_Number, Project_ID, All_Use, All_Limit, Confirm_Coupon, LastUse_Date, Coupon_No, Product_ID')
-    .or(`Phone_No.eq.${cleanKey},Coupon_No.eq.${cleanKey}`)
-    .maybeSingle();
-
-  if (error) throw new Error(`เกิดข้อผิดพลาดในการดึงข้อมูล: ${error.message}`);
-  if (!data) throw new Error(`ไม่พบข้อมูลสมาชิกหรือคูปอง (${cleanKey}) ในระบบ`);
-
-  if (data.Confirm_Coupon === true) {
-    throw new Error('❌ คูปองนี้ถูกใช้งานไปแล้ว ไม่สามารถใช้ซ้ำได้');
-  }
-
-  if (!data.Coupon_No && cleanKey.startsWith('CPN-')) {
-    throw new Error('❌ ไม่พบคูปองนี้ในระบบ (อาจถูกใช้ไปแล้วหรือหมดอายุ)');
-  }
-
-  const productIdStr = data.Product_ID ? String(data.Product_ID) : null;
-  const product = productIdStr ? PRODUCT_MAP[productIdStr] : null;
-  const productName = product?.name || (productIdStr ? `สินค้า รหัส ${productIdStr}` : 'ไม่ได้เลือกสินค้า');
-
-  return {
-    id: data.ID,
-    name: data.Name || 'ลูกค้า Cafe Amazon',
-    phone: data.Phone_No,
-    address: data.House_Number || '-',
-    project: data.Project_ID || '-', // 2. แมปค่า project เพิ่มตรงนี้
-    usedCount: data.All_Use ?? 0,
-    allLimit: data.All_Limit ?? 50,
-    confirmCoupon: data.Confirm_Coupon ?? false,
-    lastUseDate: data.LastUse_Date,
-    couponNo: data.Coupon_No || 'ไม่มีคูปองที่ใช้งานอยู่',
-    productId: productIdStr,
-    productName: productName,
-    productImage: product?.image || null
-  };
-  },
-
-  /**
-   * 2. ดึงประวัติการใช้สิทธิ์/ออกใบเสร็จย้อนหลังของลูกค้า
-   * @param {string} userPhone - เบอร์โทรศัพท์ลูกค้า
-   */
-  // api.js (เฉพาะส่วน getHistory)
-
-async getHistory(userPhone) {
-  const supabase = getSupabase();
-  const cleanPhone = cleanString(userPhone);
-
-  if (!cleanPhone) throw new Error('ไม่พบข้อมูลเบอร์โทรศัพท์สำหรับค้นหาประวัติ');
-
-  // 1. ดึงข้อมูลสมาชิกจากเบอร์โทร
-  const { data: userData, error: userErr } = await supabase
-    .from('Cafe_Amazon_Promosion_House')
-    .select('ID, Phone_No')
+    .select('*')
     .eq('Phone_No', cleanPhone)
     .maybeSingle();
 
-  if (userErr) throw new Error(`เกิดข้อผิดพลาดในการค้นหาผู้ใช้งาน: ${userErr.message}`);
-  if (!userData) return [];
+  if (error) throw new Error(`เกิดข้อผิดพลาดฐานข้อมูล: ${error.message}`);
+  if (!data) throw new Error('ไม่พบข้อมูลเบอร์โทรศัพท์นี้ในระบบ');
+  
+  // แปลงค่ารหัสผ่านใน DB เป็น String เพื่อป้องกันปัญหา Type mismatch
+  const dbPassword = String(data.PassWord ?? '').trim();
+  const inputPassword = String(password ?? '').trim();
 
-  // 2. ดึงประวัติบิลจาก Cafe_Amazon_Bill
-  const { data: bills, error: billErr } = await supabase
-    .from('Cafe_Amazon_Bill')
-    .select('Bill_No, ItemDetail, InsertDate, Coupon_No, Product_Type')
-    .eq('Cafe_Amazon_PK', userData.ID)
-    .order('InsertDate', { ascending: false });
+  // ถ้ารหัสผ่านใน DB ไม่ใช่ค่าว่าง/1234 และกรอกมาไม่ตรง ให้แจ้งเตือน
+  if (dbPassword && dbPassword !== '1234' && dbPassword !== inputPassword) {
+    throw new Error('รหัสผ่านไม่ถูกต้อง');
+  }
 
-  if (billErr) throw new Error(`เกิดข้อผิดพลาดในการดึงประวัติการใช้สิทธิ์: ${billErr.message}`);
+  // 📌 ตรวจสอบว่าเป็นรหัสผ่านเริ่มต้น (1234 หรือ ค่าว่าง) หรือไม่
+  const isDefaultPassword = (dbPassword === '' || dbPassword === '1234' || inputPassword === '1234');
 
-  return (bills || []).map((bill) => {
-    const pId = bill.Product_Type ? String(bill.Product_Type).trim() : null;
-    const mappedProduct = pId ? PRODUCT_MAP[pId] : null;
+  // ยึดสิทธิ์การใช้งานแบบมีเงื่อนไข เพื่อไม่ให้เบอร์เดียวกันเข้าได้พร้อมกัน 2 เครื่อง
+  // ตรวจสอบก่อนเพื่อแสดงข้อความที่ชัดเจน และ update แบบมีเงื่อนไขเพื่อกันการกดพร้อมกัน
+  if (data.IsUse === true || String(data.IsUse).toLowerCase() === 'true') {
+    throw new Error('ไม่สามารถเข้าสู่ระบบได้ เนื่องจากบัญชีนี้กำลังใช้งานอยู่บนอุปกรณ์อื่น');
+  }
 
-    const formattedDate = bill.InsertDate
-      ? new Date(bill.InsertDate).toLocaleString('th-TH', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      : '-';
+  const { data: claimedUser, error: claimError } = await supabase
+    .from('Cafe_Amazon_Promosion_House')
+    .update({ IsUse: true, UpdateDate: new Date().toISOString() })
+    .eq('Phone_No', cleanPhone)
+    .or('IsUse.is.false,IsUse.is.null')
+    .select('ID')
+    .maybeSingle();
 
-    return {
-      billNo: bill.Bill_No || '-',
-      useDate: formattedDate,
-      phone: cleanPhone,
-      productName: bill.ItemDetail || mappedProduct?.name || 'รายการสินค้า',
-      productImage: mappedProduct?.image || null,
-      couponNo: bill.Coupon_No || '-'
-    };
-  });
+  if (claimError) throw new Error(`ไม่สามารถตั้งค่าสถานะการใช้งาน: ${claimError.message}`);
+  if (!claimedUser) {
+    throw new Error('ไม่สามารถเข้าสู่ระบบได้ เนื่องจากบัญชีนี้กำลังใช้งานอยู่บนอุปกรณ์อื่น');
+  }
+
+  const usedCount = data.All_Use ?? 0;
+  const user = {
+    id: data.ID,
+    phone: data.Phone_No,
+    Phone_No: data.Phone_No,
+    name: data.Name || 'ลูกค้า Cafe Amazon',
+    Name: data.Name || 'ลูกค้า Cafe Amazon',
+    address: data.House_Number || '-',
+    House_Number: data.House_Number || '-',
+    usedCount: usedCount,
+    All_Use: usedCount,
+    All_Limit: data.All_Limit || 50,
+    Day_Limit: data.Day_Limit || 1,
+    isDefaultPassword: isDefaultPassword // ส่งค่านี้ไปยัง app.js
+  };
+
+  return { token: `sb-token-${data.ID}`, user };
   },
 
-  /**
-   * 3. บันทึกข้อมูลลง Cafe_Amazon_Bill และ อัปเดต Cafe_Amazon_Promosion_House
-   * @param {Object} userData - ข้อมูลสมาชิก/คูปองที่ได้จาก checkCouponInfo
-   * @param {string} billNo - เลขที่บิล
-   * @param {string} staffCode - รหัสพนักงาน
-   */
-  async commitRedeemTransaction(userData, billNo, staffCode = 'STAFF_001') {
-    const supabase = getSupabase();
-    const cleanPhone = cleanString(userData.phone);
-    const pkValue = userData.id ? parseInt(userData.id, 10) : null;
-    const nextUsedCount = (userData.usedCount || 0) + 1;
+  // คืนสิทธิ์ให้บัญชี เมื่อผู้ใช้ออกจากระบบหรือปิดหน้าแอป
+  async releaseUserUsage(phone, { keepalive = false } = {}) {
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) return;
 
-    const rawProductId = userData.productId ? String(userData.productId) : '1';
+    const payload = { IsUse: false, UpdateDate: new Date().toISOString() };
 
-    const { error: billErr } = await supabase
-      .from('Cafe_Amazon_Bill')
-      .insert([
-        {
-          Bill_No: billNo,
-          Cafe_Amazon_PK: pkValue,
-          Product_Type: rawProductId.substring(0, 13),
-          ItemDetail: userData.productName,
-          Price: 0.00,
-          Discount: 0.00,
-          Change: 0.00,
-          InsertDate: new Date().toISOString(),
-          IsUse: true,
-          Coupon_No: userData.couponNo !== 'ไม่มีคูปองที่ใช้งานอยู่' ? userData.couponNo : null
-        }
-      ]);
-
-    if (billErr) {
-      throw new Error(`บันทึกข้อมูลใบเสร็จ (Bill) ล้มเหลว: ${billErr.message}`);
+    // pagehide/beforeunload ต้องใช้ keepalive เพื่อให้คำขอยังส่งได้แม้หน้าเว็บกำลังปิด
+    if (keepalive) {
+      const endpoint = `${window.SUPABASE_URL}/rest/v1/Cafe_Amazon_Promosion_House?Phone_No=eq.${encodeURIComponent(cleanPhone)}`;
+      try {
+        await fetch(endpoint, {
+          method: 'PATCH',
+          headers: {
+            apikey: window.SUPABASE_KEY,
+            Authorization: `Bearer ${window.SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify(payload),
+          keepalive: true
+        });
+      } catch (err) {
+        console.warn('ไม่สามารถคืนสถานะ IsUse ขณะปิดหน้าแอป:', err);
+      }
+      return;
     }
+
+    const { error } = await getSupabase()
+      .from('Cafe_Amazon_Promosion_House')
+      .update(payload)
+      .eq('Phone_No', cleanPhone);
+    if (error) throw new Error(`ไม่สามารถคืนสถานะการใช้งาน: ${error.message}`);
+  },
+
+  // 📌 ฟังก์ชันเปลี่ยนรหัสผ่านแรกเข้า (บังคับไม่ให้ใช้ 1234)
+  async changePassword({ phone, newPassword }) {
+    const supabase = getSupabase();
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+
+    if (newPassword === '1234') {
+      throw new Error('ไม่อนุญาตให้ใช้รหัสผ่าน 1234 กรุณาตั้งรหัสผ่านอื่น');
+    }
+
+    const { error } = await supabase
+      .from('Cafe_Amazon_Promosion_House')
+      .update({
+        PassWord: newPassword,
+        UpdateDate: new Date().toISOString(),
+        UpdateUser: 'FIRST_LOGIN_CHANGE'
+      })
+      .eq('Phone_No', cleanPhone);
+
+    if (error) throw new Error(`ไม่สามารถอัปเดตรหัสผ่านได้: ${error.message}`);
+    return { success: true };
+  },
+
+  async verifyPasswordRecovery({ phone, address }) {
+    const supabase = getSupabase();
+    const cleanPhone = cleanString(phone);
+    const cleanAddress = cleanString(address);
+    if (!cleanPhone || !cleanAddress) throw new Error('กรุณากรอกเบอร์โทรศัพท์และบ้านเลขที่');
+    const { data, error } = await supabase.from('Cafe_Amazon_Promosion_House').select('*').eq('Phone_No', cleanPhone).eq('House_Number', cleanAddress).maybeSingle();
+    if (error) throw new Error(`เกิดข้อผิดพลาดฐานข้อมูล: ${error.message}`);
+    if (!data) throw new Error('ไม่พบข้อมูลที่ตรงกับเบอร์โทรศัพท์และบ้านเลขที่');
+    const usedCount = data.All_Use ?? 0;
+    return { token: `sb-token-${data.ID}`, user: { id: data.ID, phone: data.Phone_No, Phone_No: data.Phone_No, name: data.Name || 'ลูกค้า Cafe Amazon', Name: data.Name || 'ลูกค้า Cafe Amazon', address: data.House_Number || '-', House_Number: data.House_Number || '-', usedCount, All_Use: usedCount, All_Limit: data.All_Limit || 50, Day_Limit: data.Day_Limit || 1, isDefaultPassword: false } };
+  },
+
+  // 2. รายการสินค้า
+  async products(token) {
+    return [
+      { id: '1', name: 'แบล็คคอฟฟี (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/black-coffee.webp', color: 'orange' },
+      { id: '2', name: 'เอสเปรสโซ (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/espresso.webp', color: 'green' },
+      { id: '3', name: 'ชานม (Free)', detail: 'เย็น มูลค่า 50 บาท', image: 'public/assets/image/tea-with-milk.webp', color: 'gold' }
+    ];
+  },
+
+  // 3. สร้างคูปอง
+  async createCoupon(payload, token) {
+    const supabase = getSupabase();
+    let productId = typeof payload === 'object' ? (payload.productId || payload.id) : payload;
+    let phone = typeof payload === 'object' ? payload.phone : null;
+    let address = typeof payload === 'object' ? payload.address : '';
+
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) throw new Error('ไม่พบเบอร์โทรศัพท์ของผู้ใช้งาน');
+    if (!productId) throw new Error('กรุณาระบุรหัสสินค้า');
+
+    const { data: userRecord, error: fetchErr } = await supabase
+      .from('Cafe_Amazon_Promosion_House')
+      .select('All_Use, All_Limit, House_Number')
+      .eq('Phone_No', cleanPhone)
+      .maybeSingle();
+
+    if (fetchErr || !userRecord) throw new Error('ไม่พบข้อมูลเบอร์โทรศัพท์ในระบบ');
+    
+    if ((userRecord.All_Use ?? 0) >= (userRecord.All_Limit ?? 50)) {
+      throw new Error(`คุณใช้สิทธิ์ครบจำนวนเต็ม ${userRecord.All_Limit} แก้วแล้ว`);
+    }
+
+    const strProductId = String(productId);
+    const couponId = `CPN-${strProductId}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const finalProductId = isNaN(Number(productId)) ? strProductId : Number(productId);
 
     const { error: updateErr } = await supabase
       .from('Cafe_Amazon_Promosion_House')
-      .update({
-        All_Use: nextUsedCount,
-        LastUse_Date: new Date().toISOString(),
-        Confirm_Coupon: true,
-        Coupon_No: null,
-        Product_ID: null,
+      .update({ 
+        Confirm_Coupon: false,
+        Coupon_No: couponId,
+        Product_ID: finalProductId,
         UpdateDate: new Date().toISOString(),
-        UpdateUser: staffCode
+        UpdateUser: 'COUPON_APP'
       })
-      .eq('Phone_No', cleanPhone)
-      .eq('Confirm_Coupon', false);
+      .eq('Phone_No', cleanPhone);
 
-    if (updateErr) {
-      throw new Error(`บันทึก Bill สำเร็จ แต่ใช้สิทธิ์ในตารางหลักล้มเหลว: ${updateErr.message}`);
-    }
+    if (updateErr) throw new Error(`ปรับสถานะคูปองไม่สำเร็จ: ${updateErr.message}`);
 
+    const issuedAt = Date.now();
     return {
-      success: true,
+      id: couponId,
+      issuedAt,
+      expiresAt: issuedAt + 3 * 60 * 1000,
+      productId: strProductId,
+      address: address || userRecord.House_Number || '-',
       phone: cleanPhone,
-      billNo: billNo,
-      usedCount: nextUsedCount
+      Confirm_Coupon: false,
+      Coupon_No: couponId
     };
   },
 
-  /**
-   * 4. ดึงตารางข้อมูลสมาชิกทั้งหมด
-   */
-  async getHouseTableData() {
+  // 📌 ฟังก์ชันสร้างเลขบิลแบบปี ค.ศ. เดือน วัน รัน 4 หลัก (รีเซ็ตวันต่อวัน)
+  async generateNextBillNo() {
     const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from('Cafe_Amazon_Promosion_House')
-      .select('ID, Name, Phone_No, House_Number, Project_ID, All_Use, All_Limit, Day_Limit, IsUse, Access_Level, Confirm_Coupon, Product_ID')
-      .order('Name', { ascending: true });
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const datePrefix = `${year}${month}${day}`; // เช่น "20260922"
 
-    if (error) throw new Error(`ดึงข้อมูลตารางล้มเหลว: ${error.message}`);
+    const startOfDay = `${year}-${month}-${day}T00:00:00.000+07:00`;
+    const endOfDay = `${year}-${month}-${day}T23:59:59.999+07:00`;
 
-    return (data || []).map(item => ({
-      id: item.ID,
-      name: item.Name || '-',
-      phone: item.Phone_No || '-',
-      address: item.House_Number || '-',
-      project: item.Project_ID || '-',
-      usedCount: item.All_Use ?? 0,
-      allLimit: item.All_Limit ?? 10,
-      quotaPerDay: item.Day_Limit ?? 1, // อ่านค่า Day_Limit จากเบส
-      isUse: item.IsUse ?? false,
-      accessLevel: item.Access_Level ?? 0
-    }));
-  },
+    // ดึงบิลล่าสุดของวันนี้
+    const { data: latestBills, error } = await supabase
+      .from('Cafe_Amazon_Bill')
+      .select('Bill_No')
+      .gte('InsertDate', startOfDay)
+      .lte('InsertDate', endOfDay)
+      .order('InsertDate', { ascending: false })
+      .limit(1);
 
-  /**
-   * 5. เพิ่ม หรือ แก้ไขข้อมูลสมาชิก
-   */
-    async saveHouseData(payload) {
-    const supabase = getSupabase();
-    const cleanPhone = cleanString(payload.phone);
-    const cleanName = cleanString(payload.name);
-
-    if (!cleanPhone || !cleanName) {
-      throw new Error('กรุณากรอกชื่อ-นามสกุล และ เบอร์โทรศัพท์ ให้ครบถ้วน');
+    let nextSeq = 1;
+    if (!error && latestBills && latestBills.length > 0) {
+      const lastBillNo = String(latestBills[0].Bill_No || '');
+      // ดึงเลขรัน 4 หลักสุดท้ายออกมา
+      if (lastBillNo.startsWith(datePrefix) && lastBillNo.length >= 12) {
+        const lastSeqStr = lastBillNo.slice(-4);
+        const lastSeq = parseInt(lastSeqStr, 10);
+        if (!isNaN(lastSeq)) {
+          nextSeq = lastSeq + 1;
+        }
+      }
     }
 
-    const dayLimitValue = payload.quotaPerDay ?? payload.Day_Limit ?? 1;
-
-    const recordData = {
-      Name: cleanName,
-      Phone_No: cleanPhone,
-      House_Number: cleanString(payload.address),
-      Project_ID: cleanString(payload.project),
-      Day_Limit: dayLimitValue,  // ✅ บันทึกตรงตามค่าที่กรอก (หรือ quotaPerDay)
-      Access_Level: Number(payload.accessLevel) === 1 ? 1 : 0,
-      IsUse: payload.id ? Boolean(payload.isUse) : false,
-      All_Use: payload.usedCount ?? 0,
-      All_Limit: payload.allLimit ?? 10,
-      UpdateDate: new Date().toISOString()
-    };
-
-    if (payload.id) {
-      // ✏️ กรณีแก้ไขข้อมูลเดิม (UPDATE)
-      const { error } = await supabase
-        .from('Cafe_Amazon_Promosion_House')
-        .update(recordData)
-        .eq('ID', payload.id);
-
-      if (error) throw new Error(`อัปเดตข้อมูลล้มเหลว: ${error.message}`);
-    } else {
-      // ➕ กรณีเพิ่มข้อมูลใหม่ครั้งแรก (INSERT)
-      recordData.PassWord = '1234'; 
-
-      const { error } = await supabase
-        .from('Cafe_Amazon_Promosion_House')
-        .insert([recordData]);
-
-      if (error) throw new Error(`เพิ่มข้อมูลใหม่ล้มเหลว: ${error.message}`);
-    }
-
-    return { success: true };
-    },
-
-  /**
-   * 6. ลบข้อมูลสมาชิก
-   */
-  async deleteHouseData(id) {
-    const supabase = getSupabase();
-    const { error } = await supabase
-      .from('Cafe_Amazon_Promosion_House')
-      .delete()
-      .eq('ID', id);
-
-    if (error) throw new Error(`ลบข้อมูลล้มเหลว: ${error.message}`);
-    return { success: true };
+    const seqFormatted = String(nextSeq).padStart(4, '0');
+    return `${datePrefix}${seqFormatted}`; // ตัวอย่าง: 202609220001
   },
 
-  /**
-   * 7. รีเซ็ตรหัสผ่านกลับเป็น 1234
-   */
-  async resetPassword(id, newPassword = '1234') {
+  async resetExpiredCoupon(phone) {
     const supabase = getSupabase();
-    const { error } = await supabase
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) return;
+
+    await supabase
       .from('Cafe_Amazon_Promosion_House')
       .update({ 
-        PassWord: newPassword, // ใช้อักษรตัวพิมพ์เล็กให้ตรงกับใน Supabase
+        Confirm_Coupon: false,
+        Coupon_No: null,
+        Product_ID: null,
         UpdateDate: new Date().toISOString()
       })
-      .eq('ID', id);
+      .eq('Phone_No', cleanPhone);
+  },
 
-    if (error) throw new Error(`รีเซ็ตรหัสผ่านล้มเหลว: ${error.message}`);
-    return { success: true };
+  async checkHistory(phone) {
+    const supabase = getSupabase();
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) throw new Error('ไม่พบเบอร์โทรศัพท์ของผู้ใช้งาน');
+
+    const { data: user } = await supabase
+      .from('Cafe_Amazon_Promosion_House')
+      .select('ID')
+      .eq('Phone_No', cleanPhone)
+      .maybeSingle();
+
+    if (!user) throw new Error('ไม่พบข้อมูลผู้ใช้งาน');
+
+    const { data: bills, error: billErr } = await supabase
+      .from('Cafe_Amazon_Bill')
+      .select('ID, InsertDate, Coupon_No, Bill_No')
+      .eq('Cafe_Amazon_PK', user.ID)
+      .order('InsertDate', { ascending: false });
+
+    if (billErr) throw new Error(`ไม่สามารถดึงข้อมูลประวัติได้: ${billErr.message}`);
+
+    return (bills || []).map(item => {
+      let productId = '1';
+      if (item.Coupon_No && item.Coupon_No.startsWith('CPN-')) {
+        const parts = item.Coupon_No.split('-');
+        if (parts.length >= 2) productId = parts[1];
+      }
+
+      return {
+        id: item.ID,
+        billNo: item.Bill_No || '-',
+        couponNo: item.Coupon_No || '-',
+        productId: String(productId),
+        useDate: item.InsertDate ? new Date(item.InsertDate).toLocaleString('th-TH', {
+          year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : '-'
+      };
+    });
   }
 };
