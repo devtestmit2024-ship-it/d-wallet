@@ -48,7 +48,7 @@
     <!-- Application Scripts -->
     <script src="config.js?v=7"></script>
     <script src="api.js?v=11"></script>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
 
     <!-- 📌 PWA Service Worker & Install Prompt Handler (ไว้ท้ายสุดจุดเดียว) -->
     <script>
@@ -68,6 +68,8 @@
       window.addEventListener('beforeinstallprompt', (event) => {
         event.preventDefault();
         deferredInstallPrompt = event;
+        window.pwaInstallReady = true;
+        window.dispatchEvent(new Event('pwa-install-available'));
       });
 
       window.requestPwaInstall = async () => {
@@ -75,6 +77,7 @@
         try {
           await deferredInstallPrompt.prompt();
           await deferredInstallPrompt.userChoice;
+          return true;
         } catch (err) {
           console.warn('ไม่สามารถเปิดหน้าติดตั้ง PWA:', err);
         } finally {
