@@ -133,6 +133,24 @@ function showInstallGuide() {
 
 window.addEventListener('pwa-install-available', showInstallGuide);
 
+function showInstalledPwaNotice() {
+  document.querySelector('#pwa-install-guide')?.remove();
+  localStorage.setItem(INSTALL_GUIDE_DISMISSED_KEY, '1');
+  document.querySelector('#pwa-installed-notice')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="pwa-installed-notice" style="position:fixed; inset:0; z-index:30001; display:grid; place-items:center; padding:20px; background:rgba(20,40,29,.62);">
+      <section role="dialog" aria-modal="true" style="width:min(100%,360px); padding:22px; border-radius:18px; background:#fffaf4; color:#2c241d; box-shadow:0 20px 45px rgba(0,0,0,.28); text-align:center;">
+        <div style="font-size:36px;">✅</div>
+        <h2 style="margin:6px 0; font-size:1.3rem; color:#194832;">ติดตั้งแอปแล้ว</h2>
+        <p style="margin:0 0 16px; color:#766b5e; line-height:1.55;">กรุณาปิดหน้าเว็บนี้ แล้วเปิดแอปจากไอคอนที่เพิ่งติดตั้งบนหน้าจอหลัก</p>
+        <button id="btn-close-installed-notice" type="button" style="padding:10px 14px; border:0; border-radius:10px; background:#256b45; color:#fff; font-weight:700;">รับทราบ</button>
+      </section>
+    </div>`);
+  document.querySelector('#btn-close-installed-notice').onclick = () => document.querySelector('#pwa-installed-notice')?.remove();
+}
+
+window.addEventListener('pwa-installed', showInstalledPwaNotice);
+
 // เมื่อปิดหน้าเว็บ/แอป ให้คืนสถานะ IsUse โดยไม่รอให้หน้าเว็บทำงานต่อ
 function releaseUsageOnDisconnect() {
   const phone = session?.user?.phone || session?.user?.Phone_No;
@@ -192,8 +210,8 @@ function renderAuth() {
 
  layout(`<div class="auth-wrap"><div class="hero"><img src="public/assets/image/icon-192.png" alt="D Wallet" class="hero-logo" style="width: 100px; height: 100px; object-fit: contain; margin-bottom: 0.5rem; border-radius: 8px;"><div class="login-brand-name">D Wallet</div><h2>เข้าสู่ระบบเพื่อรับสิทธิ์</h2><p>กรอกเบอร์โทรศัพท์และรหัสผ่านเพื่อเข้าใช้งาน</p></div>
   <form class="card auth-card" id="auth-form">
-    <label>เบอร์โทรศัพท์<input required name="phone" inputmode="tel" pattern="0[0-9]{8,9}" placeholder="08x-xxx-xxxx" autocomplete="tel"></label>
-    <label>รหัสผ่าน<input required name="password" type="password" minlength="4" placeholder="กรอกรหัสผ่าน" autocomplete="current-password"></label>
+    <label>เบอร์โทรศัพท์<input required name="phone" inputmode="tel" pattern="0[0-9]{8,9}" autocomplete="tel"></label>
+    <label>รหัสผ่าน<input required name="password" type="password" minlength="4" autocomplete="current-password"></label>
     <button class="primary" type="submit">เข้าสู่ระบบ <span>→</span></button>
     <p class="forgot-password"><button id="forgot-password" type="button">ลืมรหัสผ่าน?</button></p>
   </form></div>`);
@@ -228,7 +246,7 @@ function renderAuth() {
 function renderForgotPassword() {
   currentView = 'forgot-password';
   clearTimeout(inactivityTimer);
-  layout(`<div class="auth-wrap"><div class="hero"><span class="hero-icon">🔐</span><h2>ลืมรหัสผ่าน</h2><p>ยืนยันตัวตนด้วยเบอร์โทรศัพท์และบ้านเลขที่</p></div><form class="card auth-card" id="forgot-password-form"><label>เบอร์โทรศัพท์<input required name="phone" inputmode="tel" pattern="0[0-9]{8,9}" placeholder="08x-xxx-xxxx" autocomplete="tel"></label><label>บ้านเลขที่<input required name="address" placeholder="เช่น 99/1" autocomplete="street-address"></label><button class="primary" type="submit">ยืนยันข้อมูล <span>→</span></button></form></div>`, true);
+  layout(`<div class="auth-wrap"><div class="hero"><span class="hero-icon">🔐</span><h2>ลืมรหัสผ่าน</h2><p>ยืนยันตัวตนด้วยเบอร์โทรศัพท์และบ้านเลขที่</p></div><form class="card auth-card" id="forgot-password-form"><label>เบอร์โทรศัพท์<input required name="phone" inputmode="tel" pattern="0[0-9]{8,9}" autocomplete="tel"></label><label>บ้านเลขที่<input required name="address" autocomplete="street-address"></label><button class="primary" type="submit">ยืนยันข้อมูล <span>→</span></button></form></div>`, true);
   document.querySelector('#forgot-password-form').onsubmit = async e => {
     e.preventDefault();
     const btn = e.submitter;
@@ -243,7 +261,7 @@ function renderForgotPassword() {
 
 function renderRecoveryPassword() {
   currentView = 'recovery-password';
-  layout(`<div class="auth-wrap"><div class="hero"><span class="hero-icon">✓</span><h2>ตั้งรหัสผ่านใหม่</h2><p>กรอกรหัสผ่านใหม่และยืนยันอีกครั้ง</p></div><form class="card auth-card" id="recovery-password-form"><label>รหัสผ่านใหม่<input required name="newPassword" type="password" minlength="4" placeholder="อย่างน้อย 4 ตัวอักษร" autocomplete="new-password"></label><label>ยืนยันรหัสผ่านใหม่<input required name="confirmPassword" type="password" minlength="4" placeholder="กรอกรหัสผ่านใหม่อีกครั้ง" autocomplete="new-password"></label><button class="primary" type="submit">บันทึกรหัสผ่านใหม่ <span>→</span></button></form></div>`, true);
+  layout(`<div class="auth-wrap"><div class="hero"><span class="hero-icon">✓</span><h2>ตั้งรหัสผ่านใหม่</h2><p>กรอกรหัสผ่านใหม่และยืนยันอีกครั้ง</p></div><form class="card auth-card" id="recovery-password-form"><label>รหัสผ่านใหม่<input required name="newPassword" type="password" minlength="4" autocomplete="new-password"></label><label>ยืนยันรหัสผ่านใหม่<input required name="confirmPassword" type="password" minlength="4" autocomplete="new-password"></label><button class="primary" type="submit">บันทึกรหัสผ่านใหม่ <span>→</span></button></form></div>`, true);
   document.querySelector('#recovery-password-form').onsubmit = async e => {
     e.preventDefault();
     const btn = e.submitter;
@@ -268,8 +286,8 @@ function renderForceChangePassword() {
         <p>เนื่องจากนี่เป็นการเข้าใช้งานครั้งแรก กรุณาตั้งรหัสผ่านใหม่เพื่อความปลอดภัย</p>
       </div>
       <form class="card auth-card" id="change-pwd-form">
-        <label>รหัสผ่านใหม่<input required name="newPassword" type="password" minlength="4" placeholder="อย่างน้อย 4 ตัวอักษร (ห้ามตั้ง 1234)"></label>
-        <label>ยืนยันรหัสผ่านใหม่<input required name="confirmPassword" type="password" minlength="4" placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"></label>
+        <label>รหัสผ่านใหม่<input required name="newPassword" type="password" minlength="4"></label>
+        <label>ยืนยันรหัสผ่านใหม่<input required name="confirmPassword" type="password" minlength="4"></label>
         <button class="primary" type="submit">ยืนยันเปลี่ยนรหัสผ่าน <span>→</span></button>
       </form>
     </div>

@@ -48,7 +48,7 @@
     <!-- Application Scripts -->
     <script src="config.js?v=7"></script>
     <script src="api.js?v=11"></script>
-    <script src="app.js?v=20"></script>
+    <script src="app.js?v=22"></script>
 
     <!-- 📌 PWA Service Worker & Install Prompt Handler (ไว้ท้ายสุดจุดเดียว) -->
     <script>
@@ -85,10 +85,11 @@
         }
       };
 
-      window.addEventListener('appinstalled', () => {
-        deferredInstallPrompt = null;
-        console.log('ติดตั้ง D Wallet สำเร็จ');
-      });
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      console.log('ติดตั้ง D Wallet สำเร็จ');
+      window.dispatchEvent(new Event('pwa-installed'));
+    });
     </script>
   </body>
 </html>
