@@ -62,6 +62,14 @@ async function logoutUser() {
   clearInterval(couponTimer);
   cleanupSubscriptions();
   if (session?.user) await clearCouponData();
+  const phone = session?.user?.phone || session?.user?.Phone_No;
+  if (phone && window.api?.releaseUserUsage) {
+    try {
+      await window.api.releaseUserUsage(phone);
+    } catch (err) {
+      console.error('ไม่สามารถคืนสถานะ IsUse:', err);
+    }
+  }
   sessionStorage.clear();
   session = null;
   currentCoupon = null;
@@ -77,23 +85,29 @@ const showToast = text => { toast.textContent = text; toast.classList.add('show'
 const saveSession = value => { session = value; sessionStorage.setItem('benefit-session', JSON.stringify(value)); resetInactivityTimer(); };
 const buttonLoading = (button, on) => { button.disabled = on; button.dataset.label ||= button.innerHTML; button.innerHTML = on ? '<span class="spinner"></span> กรุณารอสักครู่' : button.dataset.label; };
 
+// เมื่อปิดหน้าเว็บ/แอป ให้คืนสถานะ IsUse โดยไม่รอให้หน้าเว็บทำงานต่อ
+function releaseUsageOnDisconnect() {
+  const phone = session?.user?.phone || session?.user?.Phone_No;
+  if (phone && window.api?.releaseUserUsage) {
+    window.api.releaseUserUsage(phone, { keepalive: true });
+  }
+}
+
+window.addEventListener('pagehide', releaseUsageOnDisconnect);
+window.addEventListener('beforeunload', releaseUsageOnDisconnect);
+window.addEventListener('offline', releaseUsageOnDisconnect);
+
 function layout(content, back = false) {
   app.innerHTML = `<section class="shell">
     <header class="topbar ${currentView === 'auth' ? 'topbar-login' : ''}" style="display: flex; justify-content: space-between; align-items: center;">
-  <!-- ฝั่งซ้าย: ปุ่มย้อนกลับ (ถ้ามี) + โลโก้และชื่อ D Wallet -->
+  <!-- ฝั่งซ้าย: ปุ่มย้อนกลับ (ถ้ามี) -->
   <div style="display: flex; align-items: center; gap: 0.75rem;">
     ${back ? '<button class="back" id="back" type="button" aria-label="ย้อนกลับ"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>' : ''}
-    ${currentView !== 'auth' ? `
-      <div class="topbar-brand" style="display: flex; align-items: center; gap: 0.5rem;">
-        <img src="public/assets/image/icon-192.png" alt="D Wallet" class="hero-logo" style="width: 36px; height: 36px; object-fit: contain; border-radius: 6px;">
-        <span>D Wallet</span>
-      </div>
-    ` : ''}
   </div>
 
   <!-- ฝั่งขวา: ปุ่มออกจากระบบ -->
   <div class="topbar-actions" style="display: flex; align-items: center; gap: 0.5rem;">
-    ${session ? '<button class="logout" id="logout">ออกจากระบบ</button>' : ''}
+    ${session ? '<button class="logout" id="logout"><span aria-hidden="true">↪</span> ออกจากระบบ</button>' : ''}
   </div>
 </header>
     ${content}
@@ -389,16 +403,20 @@ function renderConfirm(product) {
   resetInactivityTimer();
   const user = session.user || {};
 
-  const productVisual = product.image ? `<img src="${esc(product.image)}" alt="${esc(product.name)}">` : `<span aria-hidden="true">${esc(product.icon || '☕')}</span>`;
-  layout(`<div class="page-title"><h2>ยืนยันข้อมูลรับสิทธิ์</h2></div><div class="card selected">${productVisual}<div><small>รายการที่เลือก</small><strong>${esc(product.name)}</strong><em>${esc(product.detail || '')}</em></div></div><form class="card details" id="coupon-form"><label>บ้านเลขที่<input name="address" required value="${esc(user.address || user.House_Number)}"></label><label>เบอร์โทรศัพท์<input name="phone" required inputmode="tel" pattern="0[0-9]{8,9}" value="${esc(user.phone || user.Phone_No)}"></label><button class="primary" type="submit">สร้างคูปอง QR <span>→</span></button></form>`, true);
+  const productVisual = product.image ? `<img class="confirm-product-image" src="${esc(product.image)}" alt="${esc(product.name)}">` : `<span class="confirm-product-fallback" aria-hidden="true">${esc(product.icon || '☕')}</span>`;
+  layout(`<div class="page-title"><h2>ยืนยันรับสิทธิ์</h2><span>ตรวจสอบรายการที่คุณเลือกก่อนสร้าง QR</span></div><div class="card selected product-confirm">${productVisual}<div><small>รายการที่เลือก</small><strong>${esc(product.name)}</strong><em>${esc(product.detail || '')}</em></div></div><form class="card details confirmation-action" id="coupon-form"><button class="primary" type="submit">ยืนยันและสร้าง QR <span>→</span></button></form>`, true);
   
   document.querySelector('#coupon-form').onsubmit = async e => {
     e.preventDefault(); 
     const btn = e.submitter; 
     buttonLoading(btn, true);
     try { 
-      const formEntries = Object.fromEntries(new FormData(e.currentTarget));
-      currentCoupon = await api.createCoupon({ productId: product.id, ...formEntries, Confirm_Coupon: false }, session.token); 
+      currentCoupon = await api.createCoupon({
+        productId: product.id,
+        phone: user.phone || user.Phone_No,
+        address: user.address || user.House_Number,
+        Confirm_Coupon: false
+      }, session.token); 
       currentCoupon.product = product; 
       renderCoupon(); 
     } catch (err) { 
@@ -417,7 +435,7 @@ function renderCoupon() {
 
   layout(`
     <div class="coupon-head">
-      <h2>แสดง QR ให้เจ้าหน้าที่สแกน</h2>
+      <h2>แสดง QR ให้พนักงานสแกน</h2>
     </div>
     <section class="coupon">
       <div class="qr-wrap">
@@ -425,12 +443,9 @@ function renderCoupon() {
       </div>
       <p class="coupon-id">รหัสคูปอง: <b>${esc(c.id)}</b></p>
       <div class="expiry">
-        <span>⏱</span><strong id="countdown">15:00</strong>
+        <span>⏱</span><strong id="countdown">03:00</strong>
       </div>
     </section>
-    <div class="coupon-actions">
-      <button id="coupon-close" class="close-coupon">ยกเลิก / ปิด</button>
-    </div>
   `, true);
   
   const payload = JSON.stringify({ 
@@ -511,15 +526,6 @@ function renderCoupon() {
   update(); 
   couponTimer = setInterval(update, 1000);
 
-  document.querySelector('#coupon-close').onclick = async () => { 
-    if (confirm('คุณต้องการยกเลิกการแสดง QR Code ใช่หรือไม่?')) {
-      clearInterval(couponTimer); 
-      cleanupSubscriptions();
-      await clearCouponData(c.phone);
-      currentCoupon = null; 
-      renderProducts(); 
-    }
-  };
 }
 
 // --- หน้าสำเร็จ ---
@@ -530,8 +536,8 @@ function renderSuccessView() {
   layout(`
     <div style="min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
       <div style="width: 80px; height: 80px; background: #d1fae5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: #059669; margin-bottom: 1rem;">✓</div>
-      <h2 style="font-size: 1.5rem; color: #059669;">ใช้สิทธิ์สำเร็จแล้ว!</h2>
-      <p style="color: #4b5563; margin-bottom: 1.5rem;">ระบบบันทึกรายการสิทธิ์และออกใบเสร็จเรียบร้อยแล้ว</p>
+      <h2 style="font-size: 1.5rem; color: #fff;">ใช้สิทธิ์สำเร็จแล้ว!</h2>
+      <p style="color: #fff; margin-bottom: 1.5rem;">ระบบบันทึกรายการสิทธิ์และออกใบเสร็จเรียบร้อยแล้ว</p>
       <button id="btn-confirm-success" class="primary" style="width: 100%; max-width: 280px;">ตกลง</button>
     </div>
   `, false);

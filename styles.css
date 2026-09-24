@@ -46,9 +46,12 @@ button, input, select, textarea, a {
   box-sizing: border-box;
 }
 
+/*สีพื้นหลังนอกแอปกรณีจอใหญ่*/
 body {
   margin: 0;
-  background: linear-gradient(160deg, #efe5d7 0%, #e3cdb1 48%, #d4b08a 100%);
+  /*background: linear-gradient(160deg, #dce9df 0%, #bfd5c4 52%, #a8c3af 100%);*/
+  background: linear-gradient(135deg, rgb(67, 97, 82), rgb(120, 150, 135));
+
   color: var(--ink);
   font-family: 'Noto Sans Thai', system-ui, sans-serif;
   min-height: 100dvh;
@@ -63,12 +66,13 @@ button {
   border: 0;
 }
 
+/*สีพื้นหลังในแอปป*/
 #app {
   width: 100%;
   max-width: 520px;
   margin: auto;
   min-height: 100dvh;
-  background: rgba(255, 250, 244, .86);
+  background: rgba(67, 97, 82, .92);
 }
 
 /* Safe Area Inset สำหรับการเปิดแบบ Shortcut / PWA / Web App */
@@ -165,18 +169,19 @@ button {
   height: 42px;
   display: grid;
   place-items: center;
-  border: 1px solid #d6e2db;
+  border: 1px solid #e8f2ea;
   border-radius: 50%;
-  background: #fff;
-  color: var(--green);
-  box-shadow: 0 5px 14px #0a3c2514;
+  background: #edf6ef;
+  color: var(--deep);
+  box-shadow: 0 5px 14px #163d2a38;
   transition: transform .18s, background .18s;
   font-size: 35px;
   line-height: 1;
 }
 
 .back:hover {
-  background: var(--mint);
+  background: #d7eadc;
+  color: #102f20;
   transform: translateX(-2px);
 }
 
@@ -203,9 +208,22 @@ button {
 
 .logout {
   margin-left: auto;
-  background: none;
-  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 13px;
+  border: 1px solid #9e3027;
+  border-radius: 999px;
+  background: #b63f35;
+  color: #fff;
   font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 5px 12px #8e3e3040;
+}
+
+.logout:hover {
+  background: #913027;
+  color: #fff;
 }
 
 .demo-note {
@@ -253,6 +271,19 @@ button {
   font-size: 14px;
   line-height: 1.65;
   margin: 0;
+}
+
+/* ข้อความที่วางอยู่บนพื้นหลังแอปสีเขียว */
+.login-brand-name,
+.hero h2,
+.hero p,
+.page-title h2,
+.page-title p,
+.page-title span,
+.coupon-head h2,
+.coupon-head p,
+.loading {
+  color: #fff;
 }
 
 .card {
@@ -511,11 +542,71 @@ input:focus {
 
 .selected > img,
 .coupon-product > img {
-  width: 42px;
-  height: 42px;
+  width: 256px;
+  height: 256px;
   object-fit: cover;
   border-radius: 10px;
   flex-shrink: 0;
+}
+
+.product-confirm {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  background: #fffaf4;
+}
+
+.product-confirm > div {
+  display: grid;
+  gap: 5px;
+}
+
+.product-confirm strong {
+  font-size: 20px;
+}
+
+.product-confirm > .confirm-product-image,
+.product-confirm > .confirm-product-fallback {
+  width: 100%;
+  max-width: 200px;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 12px 25px #5f382126;
+}
+
+.confirm-product-fallback {
+  display: grid;
+  place-items: center;
+  background: #ead6be;
+  font-size: 72px;
+}
+
+.confirmation-action {
+  padding: 14px;
+}
+
+.coupon-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.close-coupon {
+  width: min(100%, 180px);
+  margin: 0;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: #b63f35;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 8px 16px #b63f3530;
+}
+
+.close-coupon:hover {
+  background: #913027;
 }
 
 .details {
@@ -552,7 +643,7 @@ input:focus {
 
 .coupon-head p {
   font-size: 13px;
-  color: var(--green);
+  color: #fff;
   font-weight: 700;
   margin: 8px 0 0;
 }
@@ -613,12 +704,12 @@ input:focus {
 .coupon-id {
   text-align: center;
   font-size: 11px;
-  color: var(--muted);
+  color: #fff;
   margin: 0 0 14px;
 }
 
 .coupon-id b {
-  color: var(--ink);
+  color: #fff;
 }
 
 .expiry {
@@ -753,9 +844,6 @@ input:focus {
 @media(max-width: 380px) {
   .topbar {
     margin-bottom: 22px;
-  }
-  .topbar-actions .logout {
-    display: none;
   }
 }
 

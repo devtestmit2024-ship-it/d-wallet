@@ -91,6 +91,25 @@ async login({ phone, password }) {
   // 📌 ตรวจสอบว่าเป็นรหัสผ่านเริ่มต้น (1234 หรือ ค่าว่าง) หรือไม่
   const isDefaultPassword = (dbPassword === '' || dbPassword === '1234' || inputPassword === '1234');
 
+  // ยึดสิทธิ์การใช้งานแบบมีเงื่อนไข เพื่อไม่ให้เบอร์เดียวกันเข้าได้พร้อมกัน 2 เครื่อง
+  // ตรวจสอบก่อนเพื่อแสดงข้อความที่ชัดเจน และ update แบบมีเงื่อนไขเพื่อกันการกดพร้อมกัน
+  if (data.IsUse === true || String(data.IsUse).toLowerCase() === 'true') {
+    throw new Error('ไม่สามารถเข้าสู่ระบบได้ เนื่องจากบัญชีนี้กำลังใช้งานอยู่บนอุปกรณ์อื่น');
+  }
+
+  const { data: claimedUser, error: claimError } = await supabase
+    .from('Cafe_Amazon_Promosion_House')
+    .update({ IsUse: true, UpdateDate: new Date().toISOString() })
+    .eq('Phone_No', cleanPhone)
+    .or('IsUse.is.false,IsUse.is.null')
+    .select('ID')
+    .maybeSingle();
+
+  if (claimError) throw new Error(`ไม่สามารถตั้งค่าสถานะการใช้งาน: ${claimError.message}`);
+  if (!claimedUser) {
+    throw new Error('ไม่สามารถเข้าสู่ระบบได้ เนื่องจากบัญชีนี้กำลังใช้งานอยู่บนอุปกรณ์อื่น');
+  }
+
   const usedCount = data.All_Use ?? 0;
   const user = {
     id: data.ID,
@@ -108,6 +127,41 @@ async login({ phone, password }) {
   };
 
   return { token: `sb-token-${data.ID}`, user };
+  },
+
+  // คืนสิทธิ์ให้บัญชี เมื่อผู้ใช้ออกจากระบบหรือปิดหน้าแอป
+  async releaseUserUsage(phone, { keepalive = false } = {}) {
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) return;
+
+    const payload = { IsUse: false, UpdateDate: new Date().toISOString() };
+
+    // pagehide/beforeunload ต้องใช้ keepalive เพื่อให้คำขอยังส่งได้แม้หน้าเว็บกำลังปิด
+    if (keepalive) {
+      const endpoint = `${window.SUPABASE_URL}/rest/v1/Cafe_Amazon_Promosion_House?Phone_No=eq.${encodeURIComponent(cleanPhone)}`;
+      try {
+        await fetch(endpoint, {
+          method: 'PATCH',
+          headers: {
+            apikey: window.SUPABASE_KEY,
+            Authorization: `Bearer ${window.SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify(payload),
+          keepalive: true
+        });
+      } catch (err) {
+        console.warn('ไม่สามารถคืนสถานะ IsUse ขณะปิดหน้าแอป:', err);
+      }
+      return;
+    }
+
+    const { error } = await getSupabase()
+      .from('Cafe_Amazon_Promosion_House')
+      .update(payload)
+      .eq('Phone_No', cleanPhone);
+    if (error) throw new Error(`ไม่สามารถคืนสถานะการใช้งาน: ${error.message}`);
   },
 
   // 📌 ฟังก์ชันเปลี่ยนรหัสผ่านแรกเข้า (บังคับไม่ให้ใช้ 1234)
@@ -147,7 +201,7 @@ async login({ phone, password }) {
   // 2. รายการสินค้า
   async products(token) {
     return [
-      { id: '1', name: 'แบล๊คคอฟฟี (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/black-coffee.webp', color: 'orange' },
+      { id: '1', name: 'แบล็คคอฟฟี (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/black-coffee.webp', color: 'orange' },
       { id: '2', name: 'เอสเปรสโซ (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/espresso.webp', color: 'green' },
       { id: '3', name: 'ชานม (Free)', detail: 'เย็น มูลค่า 50 บาท', image: 'public/assets/image/tea-with-milk.webp', color: 'gold' }
     ];
@@ -197,7 +251,7 @@ async login({ phone, password }) {
     return {
       id: couponId,
       issuedAt,
-      expiresAt: issuedAt + 15 * 60 * 1000,
+      expiresAt: issuedAt + 3 * 60 * 1000,
       productId: strProductId,
       address: address || userRecord.House_Number || '-',
       phone: cleanPhone,
