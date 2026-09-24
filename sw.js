@@ -1,49 +1,20 @@
-const CACHE_NAME = 'dwallet-v5';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './api.js',
-  './config.js',
-  './manifest.json',
-  './public/assets/image/icon-192.png',
-  './public/assets/image/icon-512.png'
-];
+// sw.js ( Service Worker แบบพื้นฐานเพื่อให้ PWA ติดตั้งบน Android ได้ )
+const CACHE_NAME = 'dwallet-v1';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil(clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  // ดึงข้อมูลผ่าน Network ตามปกติอย่างถูกต้อง
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    fetch(event.request).catch(() => {
+      // กรณี Offline หรือ Fetch ล้มเหลว
+      return caches.match(event.request);
+    })
   );
 });
