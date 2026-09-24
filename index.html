@@ -48,7 +48,7 @@
     <!-- Application Scripts -->
     <script src="config.js?v=7"></script>
     <script src="api.js?v=11"></script>
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
 
     <!-- 📌 PWA Service Worker & Install Prompt Handler (ไว้ท้ายสุดจุดเดียว) -->
     <script>
@@ -62,8 +62,28 @@
           .catch((err) => console.error('SW Registration Failed:', err));
       }
 
-      // ปล่อยให้ Chrome แสดงข้อเสนอการติดตั้งตามมาตรฐานของระบบ
+      // เก็บเหตุการณ์ติดตั้งไว้ แล้วเรียกหน้าติดตั้งของ Chrome จากการแตะครั้งแรกบนหน้า Login
+      // เบราว์เซอร์ไม่อนุญาตให้บังคับเปิดกล่องติดตั้งเองทันทีโดยไม่มีการแตะของผู้ใช้
+      let deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+      });
+
+      window.requestPwaInstall = async () => {
+        if (!deferredInstallPrompt || window.matchMedia('(display-mode: standalone)').matches) return;
+        try {
+          await deferredInstallPrompt.prompt();
+          await deferredInstallPrompt.userChoice;
+        } catch (err) {
+          console.warn('ไม่สามารถเปิดหน้าติดตั้ง PWA:', err);
+        } finally {
+          deferredInstallPrompt = null;
+        }
+      };
+
       window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
         console.log('ติดตั้ง D Wallet สำเร็จ');
       });
     </script>

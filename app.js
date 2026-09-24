@@ -114,6 +114,9 @@ function layout(content, back = false) {
   </section>`;
   
   document.querySelector('#back')?.addEventListener('click', async () => {
+    if (currentView === 'coupon' && !confirm('ต้องการยกเลิกการแสดง QR และกลับไปหน้าเลือกสินค้าหรือไม่?')) {
+      return;
+    }
     if (['confirm', 'coupon', 'history'].includes(currentView)) {
       clearInterval(couponTimer);
       cleanupSubscriptions();
@@ -148,6 +151,12 @@ function renderAuth() {
   </form></div>`);
 
   document.querySelector('#forgot-password').onclick = renderForgotPassword;
+
+  // Chrome อนุญาตให้เปิดหน้าติดตั้ง PWA ได้จากการแตะของผู้ใช้เท่านั้น
+  // จึงใช้การแตะครั้งแรกบนหน้า Login เพื่อเรียกกล่องติดตั้งของ Chrome โดยไม่มีปุ่มติดตั้งในหน้า
+  document.querySelector('.auth-wrap')?.addEventListener('pointerdown', () => {
+    window.requestPwaInstall?.();
+  }, { once: true });
 
   document.querySelector('#auth-form').onsubmit = async e => {
     e.preventDefault(); 
@@ -387,10 +396,7 @@ async function renderHistory() {
           <tbody>${historyRows}</tbody>
         </table>
       </div>
-      <div style="margin-top: 1.5rem;"><button id="btn-back-to-products" class="secondary" style="width: 100%; padding: 0.75rem;">← กลับหน้าเลือกสินค้า</button></div>
     `, true);
-
-    document.querySelector('#btn-back-to-products')?.addEventListener('click', () => renderProducts());
   } catch (err) {
     showToast(err.message);
   }
