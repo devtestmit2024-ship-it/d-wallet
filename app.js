@@ -25,6 +25,18 @@ let couponTimer = null;
 let couponChannel = null;
 let currentView = 'auth'; 
 
+// เมื่อคีย์บอร์ดมือถือเปิด ให้เลื่อนช่องที่กำลังกรอกขึ้นมาอยู่ในพื้นที่ที่มองเห็น
+function keepFocusedFieldVisible() {
+  const field = document.activeElement;
+  if (!field?.matches('input, textarea, select')) return;
+  window.setTimeout(() => {
+    field.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  }, 180);
+}
+
+document.addEventListener('focusin', keepFocusedFieldVisible);
+window.visualViewport?.addEventListener('resize', keepFocusedFieldVisible);
+
 async function clearCouponData(phone) {
   const userPhone = phone || session?.user?.phone || session?.user?.Phone_No || currentCoupon?.phone;
   if (!userPhone) return;
