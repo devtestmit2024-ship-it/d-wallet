@@ -29,6 +29,8 @@ let currentView = 'auth';
 function keepFocusedFieldVisible() {
   const field = document.activeElement;
   if (!field?.matches('input, textarea, select')) return;
+  // ฟอร์มล็อกอินให้เบราว์เซอร์จัดตำแหน่งตามคีย์บอร์ดเอง เพื่อไม่ให้ดันทั้งฟอร์มสูงเกินไป
+  if (field.closest('#auth-form')) return;
   window.setTimeout(() => {
     // เลื่อนเท่าที่จำเป็น เพื่อให้ช่องกรอกอยู่ต่ำลงและยังไม่ถูกคีย์บอร์ดบัง
     field.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });

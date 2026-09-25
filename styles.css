@@ -335,6 +335,11 @@ button {
   gap: 15px;
 }
 
+/* Username/Password: เหลือระยะกันคีย์บอร์ดเพียงพอดี ไม่เลื่อนฟอร์มจนขาด */
+#auth-form input {
+  scroll-margin-block: 8px 12vh;
+}
+
 label {
   display: grid;
   gap: 7px;
