@@ -30,7 +30,8 @@ function keepFocusedFieldVisible() {
   const field = document.activeElement;
   if (!field?.matches('input, textarea, select')) return;
   window.setTimeout(() => {
-    field.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    // เลื่อนเท่าที่จำเป็น เพื่อให้ช่องกรอกอยู่ต่ำลงและยังไม่ถูกคีย์บอร์ดบัง
+    field.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
   }, 180);
 }
 

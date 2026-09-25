@@ -7,7 +7,7 @@ html, body {
   overflow-x: hidden;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
-  scroll-padding-bottom: 45vh;
+  scroll-padding-bottom: 30vh;
   overscroll-behavior-y: none;
 }
 
@@ -84,6 +84,21 @@ button {
   padding-bottom: calc(38px + env(safe-area-inset-bottom, 0px));
   min-height: 100dvh;
   overflow-x: hidden;
+}
+
+/* ทุกหน้าและกล่องลอยต้องไม่ชนรอยบาก/แถบระบบ เมื่อเปิดเป็น PWA */
+#toast {
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  left: calc(50% + (env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 2);
+}
+
+#pwa-install-guide,
+#pwa-installed-notice {
+  padding:
+    calc(20px + env(safe-area-inset-top, 0px))
+    calc(20px + env(safe-area-inset-right, 0px))
+    calc(20px + env(safe-area-inset-bottom, 0px))
+    calc(20px + env(safe-area-inset-left, 0px)) !important;
 }
 
 
@@ -335,7 +350,7 @@ input, select, textarea {
   color: var(--ink);
   outline: none;
   font-size: 16px !important;
-  scroll-margin-block: 20px 45vh;
+  scroll-margin-block: 16px 30vh;
 }
 
 input:focus {
