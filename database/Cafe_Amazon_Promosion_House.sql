@@ -65,7 +65,8 @@ CREATE TABLE "Cafe_Amazon_Promosion_House" (
     "Confirm_Coupon" BOOLEAN NOT NULL DEFAULT FALSE,
     "Coupon_No" VARCHAR(50) DEFAULT NULL,
     "Product_ID" VARCHAR(13) DEFAULT NULL,
-    "Access_Level" INT DEFAULT 0
+    "Access_Level" INT DEFAULT 0,
+    CONSTRAINT "UX_CafeAmazonHouse_Phone" UNIQUE ("Phone_No")
 );
 
 -- 3. สร้างตารางประวัติการใช้สิทธิ์/ใบเสร็จ: Cafe_Amazon_Bill
@@ -118,7 +119,7 @@ CREATE TABLE `Cafe_Amazon_Promosion_House` (
   `Coupon_No` VARCHAR(50) NULL DEFAULT NULL,
   `Product_ID` VARCHAR(13) NULL DEFAULT NULL,
   PRIMARY KEY (`ID`),
-  INDEX `idx_phone_no` (`Phone_No`),
+  UNIQUE KEY `UX_CafeAmazonHouse_Phone` (`Phone_No`),
   INDEX `idx_coupon_no` (`Coupon_No`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

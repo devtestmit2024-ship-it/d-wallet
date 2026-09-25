@@ -376,7 +376,7 @@ async function renderProducts() {
       </div>
     `;
 
-    layout(`<div class="page-title"><h2>เลือกรายการสินค้า</h2></div>${userInfoHtml}${historyActionHtml}${productListHtml}`, false);
+    layout(`${userInfoHtml}<div class="page-title product-page-title"><h2>เลือกรายการสินค้า</h2><span>เลือกสิทธิ์ที่คุณต้องการรับในครั้งนี้</span></div>${productListHtml}${historyActionHtml}`, false);
     
     document.querySelector('#btn-history')?.addEventListener('click', () => renderHistory());
 

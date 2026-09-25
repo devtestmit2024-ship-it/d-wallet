@@ -85,6 +85,7 @@ button {
   overflow-x: hidden;
 }
 
+
 .topbar {
   display: flex;
   align-items: center;
@@ -96,7 +97,12 @@ button {
 }
 
 .topbar-login {
-  min-height: 36px;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.topbar-login + .auth-wrap {
+  padding-top: 0;
 }
 
 .topbar-brand {
@@ -138,7 +144,20 @@ button {
 .history-action {
   display: flex;
   justify-content: center;
-  margin: 14px 0 18px;
+  margin: 22px 0 18px;
+}
+
+.product-page-title {
+  margin: 28px 0 0;
+}
+
+.page-title.product-page-title h2 {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.product-page-title span {
+  font-size: 12px;
 }
 
 .history-action .secondary {
