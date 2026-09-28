@@ -117,8 +117,8 @@ async login({ phone, password }) {
     Phone_No: data.Phone_No,
     name: data.Name || 'ลูกค้า Cafe Amazon',
     Name: data.Name || 'ลูกค้า Cafe Amazon',
-    address: data.House_Number || '-',
-    House_Number: data.House_Number || '-',
+    address: data.Detail || '-',
+    Detail: data.Detail || '-',
     usedCount: usedCount,
     All_Use: usedCount,
     All_Limit: data.All_Limit || 50,
@@ -190,12 +190,12 @@ async login({ phone, password }) {
     const supabase = getSupabase();
     const cleanPhone = cleanString(phone);
     const cleanAddress = cleanString(address);
-    if (!cleanPhone || !cleanAddress) throw new Error('กรุณากรอกเบอร์โทรศัพท์และบ้านเลขที่');
-    const { data, error } = await supabase.from('Cafe_Amazon_Promosion_House').select('*').eq('Phone_No', cleanPhone).eq('House_Number', cleanAddress).maybeSingle();
+    if (!cleanPhone || !cleanAddress) throw new Error('กรุณากรอกเบอร์โทรศัพท์และรายละเอียดให้ครบถ้วน');
+    const { data, error } = await supabase.from('Cafe_Amazon_Promosion_House').select('*').eq('Phone_No', cleanPhone).eq('Detail', cleanAddress).maybeSingle();
     if (error) throw new Error(`เกิดข้อผิดพลาดฐานข้อมูล: ${error.message}`);
-    if (!data) throw new Error('ไม่พบข้อมูลที่ตรงกับเบอร์โทรศัพท์และบ้านเลขที่');
+    if (!data) throw new Error('ไม่พบข้อมูลที่ตรงกับเบอร์โทรศัพท์และรายละเอียด');
     const usedCount = data.All_Use ?? 0;
-    return { token: `sb-token-${data.ID}`, user: { id: data.ID, phone: data.Phone_No, Phone_No: data.Phone_No, name: data.Name || 'ลูกค้า Cafe Amazon', Name: data.Name || 'ลูกค้า Cafe Amazon', address: data.House_Number || '-', House_Number: data.House_Number || '-', usedCount, All_Use: usedCount, All_Limit: data.All_Limit || 50, Day_Limit: data.Day_Limit || 1, isDefaultPassword: false } };
+    return { token: `sb-token-${data.ID}`, user: { id: data.ID, phone: data.Phone_No, Phone_No: data.Phone_No, name: data.Name || 'ลูกค้า Cafe Amazon', Name: data.Name || 'ลูกค้า Cafe Amazon', address: data.Detail || '-', Detail: data.Detail || '-', usedCount, All_Use: usedCount, All_Limit: data.All_Limit || 50, Day_Limit: data.Day_Limit || 1, isDefaultPassword: false } };
   },
 
   // 2. รายการสินค้า
@@ -220,7 +220,7 @@ async login({ phone, password }) {
 
     const { data: userRecord, error: fetchErr } = await supabase
       .from('Cafe_Amazon_Promosion_House')
-      .select('All_Use, All_Limit, House_Number')
+      .select('All_Use, All_Limit, Detail')
       .eq('Phone_No', cleanPhone)
       .maybeSingle();
 
@@ -253,7 +253,7 @@ async login({ phone, password }) {
       issuedAt,
       expiresAt: issuedAt + 3 * 60 * 1000,
       productId: strProductId,
-      address: address || userRecord.House_Number || '-',
+      address: address || userRecord.Detail || '-',
       phone: cleanPhone,
       Confirm_Coupon: false,
       Coupon_No: couponId

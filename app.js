@@ -261,7 +261,7 @@ function renderAuth() {
 function renderForgotPassword() {
   currentView = 'forgot-password';
   clearTimeout(inactivityTimer);
-  layout(`<div class="auth-wrap"><div class="hero"><span class="hero-icon">🔐</span><h2>ลืมรหัสผ่าน</h2><p>ยืนยันตัวตนด้วยเบอร์โทรศัพท์และบ้านเลขที่</p></div><form class="card auth-card" id="forgot-password-form"><label>เบอร์โทรศัพท์<input required name="phone" inputmode="tel" pattern="0[0-9]{8,9}" autocomplete="tel"></label><label>บ้านเลขที่<input required name="address" autocomplete="street-address"></label><button class="primary" type="submit">ยืนยันข้อมูล <span>→</span></button></form></div>`, true);
+  layout(`<div class="auth-wrap"><div class="hero"><span class="hero-icon">🔐</span><h2>ลืมรหัสผ่าน</h2><p>ยืนยันตัวตนด้วยเบอร์โทรศัพท์และรายละเอียด</p></div><form class="card auth-card" id="forgot-password-form"><label>เบอร์โทรศัพท์<input required name="phone" inputmode="tel" pattern="0[0-9]{8,9}" autocomplete="tel"></label><label>รายละเอียด<input required name="address" autocomplete="street-address"></label><button class="primary" type="submit">ยืนยันข้อมูล <span>→</span></button></form></div>`, true);
   document.querySelector('#forgot-password-form').onsubmit = async e => {
     e.preventDefault();
     const btn = e.submitter;
@@ -342,7 +342,7 @@ async function renderProducts() {
   currentView = 'products';
   cleanupSubscriptions();
   resetInactivityTimer();
-  layout('<div class="page-title"><h2>เลือกรายการสินค้า</h2><span>เลือกสิทธิ์ที่คุณต้องการรับในครั้งนี้</span></div><div class="loading"><span class="spinner dark"></span> กำลังโหลดรายการ</div>', false);
+  layout('<div class="page-title"><h2>เลือกรายการสินค้า</h2></div><div class="loading"><span class="spinner dark"></span> กำลังโหลดรายการ</div>', false);
   
   try {
     const products = await api.products(session.token);
@@ -362,7 +362,7 @@ async function renderProducts() {
           <div>
             <p><strong>ชื่อ:</strong> ${esc(user.name || user.Name || '-')}</p>
             <p><strong>เบอร์โทร:</strong> ${esc(userPhone || '-')}</p>
-            <p><strong>บ้านเลขที่:</strong> ${esc(user.address || user.House_Number || '-')}</p>
+            <p><strong>รายละเอียด:</strong> ${esc(user.address || user.Detail || '-')}</p>
           </div>
         </div>
         <p style="margin-top: 0.5rem; color: #059669; font-weight: bold;">
@@ -391,7 +391,7 @@ async function renderProducts() {
       </div>
     `;
 
-    layout(`${userInfoHtml}<div class="page-title product-page-title"><h2>เลือกรายการสินค้า</h2><span>เลือกสิทธิ์ที่คุณต้องการรับในครั้งนี้</span></div>${productListHtml}${historyActionHtml}`, false);
+    layout(`${userInfoHtml}<div class="page-title product-page-title"><h2>เลือกรายการสินค้า</h2></div>${productListHtml}${historyActionHtml}`, false);
     
     document.querySelector('#btn-history')?.addEventListener('click', () => renderHistory());
 
@@ -486,7 +486,7 @@ function renderConfirm(product) {
   const user = session.user || {};
 
   const productVisual = product.image ? `<img class="confirm-product-image" src="${esc(product.image)}" alt="${esc(product.name)}">` : `<span class="confirm-product-fallback" aria-hidden="true">${esc(product.icon || '☕')}</span>`;
-  layout(`<div class="page-title"><h2>ยืนยันรับสิทธิ์</h2><span>ตรวจสอบรายการที่คุณเลือกก่อนสร้าง QR</span></div><div class="card selected product-confirm">${productVisual}<div><small>รายการที่เลือก</small><strong>${esc(product.name)}</strong><em>${esc(product.detail || '')}</em></div></div><form class="card details confirmation-action" id="coupon-form"><button class="primary" type="submit">ยืนยันและสร้าง QR <span>→</span></button></form>`, true);
+  layout(`<div class="page-title"></div><div class="card selected product-confirm">${productVisual}<div><strong>${esc(product.name)}</strong><em>${esc(product.detail || '')}</em></div></div><form class="card details confirmation-action" id="coupon-form"><button class="primary" type="submit">ยืนยันการใช้สิทธิ์ <span>→</span></button></form>`, true);
   
   document.querySelector('#coupon-form').onsubmit = async e => {
     e.preventDefault(); 
@@ -496,7 +496,7 @@ function renderConfirm(product) {
       currentCoupon = await api.createCoupon({
         productId: product.id,
         phone: user.phone || user.Phone_No,
-        address: user.address || user.House_Number,
+        address: user.address || user.Detail,
         Confirm_Coupon: false
       }, session.token); 
       currentCoupon.product = product; 
