@@ -96,7 +96,28 @@ async function logoutUser() {
 });
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c]));
-const showToast = text => { toast.textContent = text; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 3000); };
+let appDialogTimer = null;
+function showAppDialog(message, { title = 'แจ้งเตือน', autoCloseMs = 0 } = {}) {
+  clearTimeout(appDialogTimer);
+  document.querySelector('#app-message-dialog')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="app-message-dialog" style="position:fixed; inset:0; z-index:50000; display:grid; place-items:center; padding:20px; background:rgba(20,40,29,.62);">
+      <section role="dialog" aria-modal="true" aria-labelledby="app-message-title" style="width:min(100%,360px); padding:22px; border-radius:18px; background:#fffaf4; color:#2c241d; box-shadow:0 20px 45px rgba(0,0,0,.28); text-align:center;">
+        <h2 id="app-message-title" style="margin:0 0 10px; font-size:1.2rem; color:#194832;">${esc(title)}</h2>
+        <p style="margin:0 0 16px; white-space:pre-line; line-height:1.55; color:#766b5e;">${esc(message)}</p>
+        <button id="btn-close-app-message" type="button" style="padding:10px 14px; border:0; border-radius:10px; background:#256b45; color:#fff; font-weight:700;">ปิด</button>
+      </section>
+    </div>`);
+  const dialog = document.querySelector('#app-message-dialog');
+  const close = () => {
+    clearTimeout(appDialogTimer);
+    dialog?.remove();
+  };
+  document.querySelector('#btn-close-app-message').onclick = close;
+  if (autoCloseMs > 0) appDialogTimer = setTimeout(close, autoCloseMs);
+}
+const showToast = text => showAppDialog(text, { autoCloseMs: 3000 });
+window.alert = message => showAppDialog(message, { title: 'แจ้งเตือน' });
 const saveSession = value => { session = value; sessionStorage.setItem('benefit-session', JSON.stringify(value)); resetInactivityTimer(); };
 const buttonLoading = (button, on) => { button.disabled = on; button.dataset.label ||= button.innerHTML; button.innerHTML = on ? '<span class="spinner"></span> กรุณารอสักครู่' : button.dataset.label; };
 
