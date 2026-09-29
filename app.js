@@ -100,13 +100,17 @@ let appDialogTimer = null;
 function showAppDialog(message, { title = 'แจ้งเตือน', autoCloseMs = 0 } = {}) {
   clearTimeout(appDialogTimer);
   document.querySelector('#app-message-dialog')?.remove();
+  const isInternetError = String(message).includes('เชื่อมต่อ Internet ไม่ได้');
+  const messageStyle = isInternetError
+    ? 'margin:0 0 16px; white-space:pre-line; line-height:1.55; color:#dc2626; font-weight:700; animation:internet-blink .85s step-end infinite;'
+    : 'margin:0 0 16px; white-space:pre-line; line-height:1.55; color:#766b5e;';
   document.body.insertAdjacentHTML('beforeend', `
     <div id="app-message-dialog" style="position:fixed; inset:0; z-index:50000; display:grid; place-items:center; padding:20px; background:rgba(20,40,29,.62);">
       <section role="dialog" aria-modal="true" aria-labelledby="app-message-title" style="width:min(100%,360px); padding:22px; border-radius:18px; background:#fffaf4; color:#2c241d; box-shadow:0 20px 45px rgba(0,0,0,.28); text-align:center;">
         <h2 id="app-message-title" style="margin:0 0 10px; font-size:1.2rem; color:#194832;">${esc(title)}</h2>
-        <p style="margin:0 0 16px; white-space:pre-line; line-height:1.55; color:#766b5e;">${esc(message)}</p>
+        <p style="${messageStyle}">${esc(message)}</p>
         <button id="btn-close-app-message" type="button" style="padding:10px 14px; border:0; border-radius:10px; background:#256b45; color:#fff; font-weight:700;">ปิด</button>
-      </section>
+      </section><style>@keyframes internet-blink { 50% { opacity:.18; } }</style>
     </div>`);
   const dialog = document.querySelector('#app-message-dialog');
   const close = () => {
