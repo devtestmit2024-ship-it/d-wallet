@@ -65,6 +65,16 @@ function getCurrentUserPhone() {
   return '';
 }
 
+const PENDING_USAGE_RELEASE_KEY = 'client-pending-isuse-release';
+function queueUsageRelease(phone) {
+  if (phone) localStorage.setItem(PENDING_USAGE_RELEASE_KEY, cleanString(phone));
+}
+function clearQueuedUsageRelease(phone) {
+  if (!phone || localStorage.getItem(PENDING_USAGE_RELEASE_KEY) === cleanString(phone)) {
+    localStorage.removeItem(PENDING_USAGE_RELEASE_KEY);
+  }
+}
+
 window.api = {
   isDemo: false,
 
@@ -107,6 +117,14 @@ window.api = {
 async login({ phone, password }) {
   const supabase = getSupabase();
   const cleanPhone = cleanString(phone);
+
+  // หากปิด/ออฟไลน์ครั้งก่อนจนคืนสถานะไม่สำเร็จ ให้คืนค่าเดิมก่อนตรวจเข้าสู่ระบบใหม่
+  if (localStorage.getItem(PENDING_USAGE_RELEASE_KEY) === cleanPhone) {
+    await supabase.from('Cafe_Amazon_Promosion_House')
+      .update({ IsUse: false, UpdateDate: new Date().toISOString() })
+      .eq('Phone_No', cleanPhone);
+    clearQueuedUsageRelease(cleanPhone);
+  }
 
   const { data, error } = await supabase
     .from('Cafe_Amazon_Promosion_House')
@@ -167,6 +185,17 @@ async login({ phone, password }) {
   return { token: `sb-token-${data.ID}`, user };
   },
 
+  async restoreUserUsage(phone) {
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) return;
+    const { error } = await getSupabase()
+      .from('Cafe_Amazon_Promosion_House')
+      .update({ IsUse: true, UpdateDate: new Date().toISOString() })
+      .eq('Phone_No', cleanPhone);
+    if (error) throw new Error(`ไม่สามารถตั้งค่าสถานะการใช้งาน: ${error.message}`);
+    clearQueuedUsageRelease(cleanPhone);
+  },
+
   // คืนสิทธิ์ให้บัญชี เมื่อผู้ใช้ออกจากระบบหรือปิดหน้าแอป
   async releaseUserUsage(phone, { keepalive = false } = {}) {
     const cleanPhone = cleanString(phone) || getCurrentUserPhone();
@@ -178,7 +207,7 @@ async login({ phone, password }) {
     if (keepalive) {
       const endpoint = `${window.SUPABASE_URL}/rest/v1/Cafe_Amazon_Promosion_House?Phone_No=eq.${encodeURIComponent(cleanPhone)}`;
       try {
-        await fetch(endpoint, {
+        const response = await nativeFetch(endpoint, {
           method: 'PATCH',
           headers: {
             apikey: window.SUPABASE_KEY,
@@ -189,17 +218,26 @@ async login({ phone, password }) {
           body: JSON.stringify(payload),
           keepalive: true
         });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        clearQueuedUsageRelease(cleanPhone);
       } catch (err) {
+        queueUsageRelease(cleanPhone);
         console.warn('ไม่สามารถคืนสถานะ IsUse ขณะปิดหน้าแอป:', err);
       }
       return;
     }
 
-    const { error } = await getSupabase()
-      .from('Cafe_Amazon_Promosion_House')
-      .update(payload)
-      .eq('Phone_No', cleanPhone);
-    if (error) throw new Error(`ไม่สามารถคืนสถานะการใช้งาน: ${error.message}`);
+    try {
+      const { error } = await getSupabase()
+        .from('Cafe_Amazon_Promosion_House')
+        .update(payload)
+        .eq('Phone_No', cleanPhone);
+      if (error) throw error;
+      clearQueuedUsageRelease(cleanPhone);
+    } catch (error) {
+      queueUsageRelease(cleanPhone);
+      throw new Error(`ไม่สามารถคืนสถานะการใช้งาน: ${error.message}`);
+    }
   },
 
   // 📌 ฟังก์ชันเปลี่ยนรหัสผ่านแรกเข้า (บังคับไม่ให้ใช้ 1234)
