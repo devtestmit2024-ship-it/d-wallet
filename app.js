@@ -250,7 +250,7 @@ function renderAuth() {
   cleanupSubscriptions();
   clearTimeout(inactivityTimer);
 
-  layout(`<div class="auth-wrap"><div class="hero"><img src="public/assets/image/icon-192.svg" alt="D Wallet" class="hero-logo" style="width: 100px; height: 100px; object-fit: contain; margin-bottom: 0.5rem; border-radius: 8px;"><div class="login-brand-name">D Wallet</div><h2>เข้าสู่ระบบเพื่อรับสิทธิ์</h2><p>กรอกเบอร์โทรศัพท์และรหัสผ่านเพื่อเข้าใช้งาน</p></div>
+  layout(`<div class="auth-wrap"><div class="hero"><img src="public/assets/image/icon-192.png" alt="D Wallet" class="hero-logo" style="width: 100px; height: 100px; object-fit: contain; margin-bottom: 0.5rem; border-radius: 8px;"><div class="login-brand-name">D Wallet</div><h2>เข้าสู่ระบบเพื่อรับสิทธิ์</h2><p>กรอกเบอร์โทรศัพท์และรหัสผ่านเพื่อเข้าใช้งาน</p></div>
   <form class="card auth-card" id="auth-form">
     <label>เบอร์โทรศัพท์<input required name="phone" inputmode="tel" pattern="0[0-9]{8,9}" autocomplete="tel"></label>
     <label>รหัสผ่าน<input required name="password" type="password" minlength="4" autocomplete="current-password"></label>

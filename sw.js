@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dwallet-v6';
+const CACHE_NAME = 'dwallet-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -7,8 +7,8 @@ const ASSETS_TO_CACHE = [
   './api.js',
   './config.js',
   './manifest.json',
-  './public/assets/image/icon-192.svg',
-  './public/assets/image/icon-512.svg'
+  './public/assets/image/icon-192.png',
+  './public/assets/image/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
