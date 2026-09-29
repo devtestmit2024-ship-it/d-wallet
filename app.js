@@ -118,6 +118,8 @@ function showAppDialog(message, { title = 'แจ้งเตือน', autoClo
 }
 const showToast = text => showAppDialog(text, { autoCloseMs: 3000 });
 window.alert = message => showAppDialog(message, { title: 'แจ้งเตือน' });
+window.addEventListener('offline', () => showAppDialog('เชื่อมต่อ Internet ไม่ได้ กรุณาตรวจสอบหรือเชื่อมต่อ Internet แล้วลองอีกครั้ง', { title: 'Internet' }));
+window.addEventListener('online', () => showToast('เชื่อมต่อ Internet แล้ว'));
 const saveSession = value => { session = value; sessionStorage.setItem('benefit-session', JSON.stringify(value)); resetInactivityTimer(); };
 const buttonLoading = (button, on) => { button.disabled = on; button.dataset.label ||= button.innerHTML; button.innerHTML = on ? '<span class="spinner"></span> กรุณารอสักครู่' : button.dataset.label; };
 
