@@ -277,9 +277,9 @@ async login({ phone, password }) {
   // 2. รายการสินค้า
   async products(token) {
     return [
-      { id: '1', name: 'แบล็คคอฟฟี (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/black-coffee.webp', color: 'orange' },
-      { id: '2', name: 'เอสเปรสโซ (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/espresso.webp', color: 'green' },
-      { id: '3', name: 'ชานม (Free)', detail: 'เย็น มูลค่า 50 บาท', image: 'public/assets/image/tea-with-milk.webp', color: 'gold' }
+      { id: '1', name: 'แบล็คคอฟฟี (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/black-coffee.webp', color: 'orange', price: 60 },
+      { id: '2', name: 'เอสเปรสโซ (Free)', detail: 'เย็น มูลค่า 60 บาท', image: 'public/assets/image/espresso.webp', color: 'green', price: 60 },
+      { id: '3', name: 'ชานม (Free)', detail: 'เย็น มูลค่า 50 บาท', image: 'public/assets/image/tea-with-milk.webp', color: 'gold', price: 50 }
     ];
   },
 
