@@ -1,4 +1,4 @@
-// api.js (ระบบลูกค้า - ปรับปรุงการตรวจสอบรหัสผ่านแรกเข้าและการสร้างเลขบิลตามวันที่)
+// api.js (ระบบลูกค้า - Cloudflare Worker + D1)
 
 const INTERNET_ERROR_MESSAGE = 'เชื่อมต่อ Internet ไม่ได้ กรุณาตรวจสอบหรือเชื่อมต่อ Internet แล้วลองอีกครั้ง';
 const nativeFetch = window.fetch.bind(window);
@@ -15,9 +15,7 @@ async function ensureInternetConnection() {
   }
   lastInternetCheckAt = now;
   try {
-    await nativeFetch(`${window.SUPABASE_URL}/rest/v1/`, {
-      method: 'HEAD', cache: 'no-store', headers: { apikey: window.SUPABASE_KEY }
-    });
+    await nativeFetch(`${window.API_BASE_URL}/health`, { method: 'GET', cache: 'no-store' });
     lastInternetCheckPassed = true;
     return true;
   } catch (error) {
@@ -39,11 +37,9 @@ window.ensureInternetConnection = ensureInternetConnection;
 setInterval(() => ensureInternetConnection().catch(() => {}), 5000);
 
 function getSupabase() {
-  if (!window.supabase || !window.supabase.createClient) {
-    throw new Error('ระบบยังโหลด Supabase SDK ไม่สมบูรณ์ กรุณาลองใหม่อีกครั้ง');
-  }
+  if (!window.createD1Client) throw new Error('ระบบเชื่อมต่อ Cloudflare D1 ยังโหลดไม่สมบูรณ์ กรุณาลองใหม่อีกครั้ง');
   if (!window._supabaseInstance) {
-    window._supabaseInstance = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY, { global: { fetch: onlineFetch } });
+    window._supabaseInstance = window.createD1Client();
   }
   return window._supabaseInstance;
 }
@@ -97,15 +93,15 @@ window.api = {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
 
-    const startOfDay = `${year}-${month}-${day}T00:00:00.000+07:00`;
-    const endOfDay = `${year}-${month}-${day}T23:59:59.999+07:00`;
+    const startOfDay = new Date(year, now.getMonth(), now.getDate()).toISOString();
+    const endOfDay = new Date(year, now.getMonth(), now.getDate() + 1).toISOString();
 
     const { data: bill, error: billErr } = await supabase
       .from('Cafe_Amazon_Bill')
       .select('ID')
       .eq('Cafe_Amazon_PK', user.ID)
       .gte('InsertDate', startOfDay)
-      .lte('InsertDate', endOfDay)
+      .lt('InsertDate', endOfDay)
       .limit(1);
 
     if (billErr) return false;
@@ -205,20 +201,8 @@ async login({ phone, password }) {
 
     // pagehide/beforeunload ต้องใช้ keepalive เพื่อให้คำขอยังส่งได้แม้หน้าเว็บกำลังปิด
     if (keepalive) {
-      const endpoint = `${window.SUPABASE_URL}/rest/v1/Cafe_Amazon_Promosion_House?Phone_No=eq.${encodeURIComponent(cleanPhone)}`;
       try {
-        const response = await nativeFetch(endpoint, {
-          method: 'PATCH',
-          headers: {
-            apikey: window.SUPABASE_KEY,
-            Authorization: `Bearer ${window.SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal'
-          },
-          body: JSON.stringify(payload),
-          keepalive: true
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        await window.d1Request({ table: 'Cafe_Amazon_Promosion_House', action: 'update', values: payload, filters: [{ column: 'Phone_No', op: 'eq', value: cleanPhone }], orFilters: [] }, { keepalive: true });
         clearQueuedUsageRelease(cleanPhone);
       } catch (err) {
         queueUsageRelease(cleanPhone);
@@ -345,15 +329,15 @@ async login({ phone, password }) {
     const day = String(now.getDate()).padStart(2, '0');
     const datePrefix = `${year}${month}${day}`; // เช่น "20260922"
 
-    const startOfDay = `${year}-${month}-${day}T00:00:00.000+07:00`;
-    const endOfDay = `${year}-${month}-${day}T23:59:59.999+07:00`;
+    const startOfDay = new Date(year, now.getMonth(), now.getDate()).toISOString();
+    const endOfDay = new Date(year, now.getMonth(), now.getDate() + 1).toISOString();
 
     // ดึงบิลล่าสุดของวันนี้
     const { data: latestBills, error } = await supabase
       .from('Cafe_Amazon_Bill')
       .select('Bill_No')
       .gte('InsertDate', startOfDay)
-      .lte('InsertDate', endOfDay)
+      .lt('InsertDate', endOfDay)
       .order('InsertDate', { ascending: false })
       .limit(1);
 
