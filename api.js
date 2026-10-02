@@ -192,6 +192,36 @@ async login({ phone, password }) {
     clearQueuedUsageRelease(cleanPhone);
   },
 
+  // ดึงข้อมูลสมาชิกและจำนวนสิทธิ์ล่าสุด เพื่อไม่ใช้ค่าที่ค้างอยู่ใน Session ตอนเข้าสู่ระบบ
+  async getMemberProfile(phone) {
+    const cleanPhone = cleanString(phone) || getCurrentUserPhone();
+    if (!cleanPhone) throw new Error('ไม่พบเบอร์โทรศัพท์ของผู้ใช้งาน');
+    const { data, error } = await getSupabase()
+      .from('Cafe_Amazon_Promosion_House')
+      .select('ID, Phone_No, Name, Detail, Remark, All_Use, All_Limit, Day_Limit, Access_Level')
+      .eq('Phone_No', cleanPhone)
+      .maybeSingle();
+    if (error) throw new Error(`ไม่สามารถดึงข้อมูลสมาชิกล่าสุด: ${error.message}`);
+    if (!data) throw new Error('ไม่พบข้อมูลสมาชิกในระบบ');
+    const usedCount = Number(data.All_Use ?? 0);
+    return {
+      id: data.ID,
+      phone: data.Phone_No,
+      Phone_No: data.Phone_No,
+      name: data.Name || 'ลูกค้า Cafe Amazon',
+      Name: data.Name || 'ลูกค้า Cafe Amazon',
+      address: data.Detail || '-',
+      Detail: data.Detail || '-',
+      project: data.Remark || '-',
+      Remark: data.Remark || '-',
+      usedCount,
+      All_Use: usedCount,
+      All_Limit: Number(data.All_Limit ?? 50),
+      Day_Limit: Number(data.Day_Limit ?? 1),
+      Access_Level: Number(data.Access_Level ?? 0)
+    };
+  },
+
   // คืนสิทธิ์ให้บัญชี เมื่อผู้ใช้ออกจากระบบหรือปิดหน้าแอป
   async releaseUserUsage(phone, { keepalive = false } = {}) {
     const cleanPhone = cleanString(phone) || getCurrentUserPhone();

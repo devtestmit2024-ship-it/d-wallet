@@ -464,9 +464,18 @@ async function renderProducts() {
   layout('<div class="page-title"><h2>เลือกรายการสินค้า</h2></div><div class="loading"><span class="spinner dark"></span> กำลังโหลดรายการ</div>', false);
   
   try {
-    const products = await api.products(session.token);
-    const user = session?.user || {};
+    let user = session?.user || {};
     const userPhone = user.phone || user.Phone_No;
+
+    // รีเฟรชจำนวนสิทธิ์จากฐานข้อมูลก่อนวาดหน้า เพื่อให้ค่าหลังใช้คูปองแสดงทันที
+    if (api && typeof api.getMemberProfile === 'function' && userPhone) {
+      const latestUser = await api.getMemberProfile(userPhone);
+      session.user = { ...user, ...latestUser };
+      saveSession(session);
+      user = session.user;
+    }
+
+    const products = await api.products(session.token);
 
     const usedToday = (api && typeof api.checkTodayBillUsage === 'function')
       ? await api.checkTodayBillUsage(userPhone)
@@ -664,7 +673,10 @@ function renderCoupon() {
     });
   }
 
+  let completionHandled = false;
   const completeAndRefresh = async () => {
+    if (completionHandled) return;
+    completionHandled = true;
     clearInterval(couponTimer);
     cleanupSubscriptions();
     currentCoupon = null;
