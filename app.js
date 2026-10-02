@@ -134,7 +134,11 @@ document.addEventListener('visibilitychange', async () => {
 });
 window.addEventListener('focus', checkInactivityTimeout);
 
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c]));
+const removeVisibleProductCode = value => String(value ?? '')
+  .replace(/สินค้า\s*รหัส\s*[-\w.]+/gi, '')
+  .replace(/รหัสสินค้า\s*[:：]?\s*[-\w.]+/gi, '')
+  .trim();
+const esc = value => removeVisibleProductCode(value).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c]));
 let appDialogTimer = null;
 function showAppDialog(message, {
   title = 'แจ้งเตือน',

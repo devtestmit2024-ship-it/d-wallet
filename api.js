@@ -306,7 +306,7 @@ async login({ phone, password }) {
 
     const cleanPhone = cleanString(phone) || getCurrentUserPhone();
     if (!cleanPhone) throw new Error('ไม่พบเบอร์โทรศัพท์ของผู้ใช้งาน');
-    if (!productId) throw new Error('กรุณาระบุรหัสสินค้า');
+    if (!productId) throw new Error('กรุณาเลือกรายการสินค้า');
 
     const { data: userRecord, error: fetchErr } = await supabase
       .from('Cafe_Amazon_Promosion_House')
@@ -429,7 +429,7 @@ async login({ phone, password }) {
       let productId = '1';
       if (item.Coupon_No && item.Coupon_No.startsWith('CPN-')) {
         const parts = item.Coupon_No.split('-');
-        if (parts.length >= 2) productId = parts[1];
+        if (parts.length >= 2) productId = String(parts[1]).replace(/\.0+$/, '');
       }
 
       return {
