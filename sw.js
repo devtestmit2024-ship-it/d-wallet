@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dwallet-v8';
+const CACHE_NAME = 'dwallet-v11';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

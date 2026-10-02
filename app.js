@@ -54,6 +54,9 @@ async function clearCouponData(phone) {
 
 let inactivityTimer = null;
 const INACTIVITY_LIMIT = 15 * 60 * 1000;
+const LAST_ACTIVITY_KEY = 'benefit-last-activity-at';
+let lastActivityAt = Number(sessionStorage.getItem(LAST_ACTIVITY_KEY)) || Date.now();
+let inactivityLogoutInProgress = false;
 
 function cleanupSubscriptions() {
   if (couponChannel && window.supabaseClient) {
@@ -62,17 +65,29 @@ function cleanupSubscriptions() {
   }
 }
 
-function resetInactivityTimer() {
+async function checkInactivityTimeout() {
   clearTimeout(inactivityTimer);
-  if (session) {
-    inactivityTimer = setTimeout(async () => {
-      showToast('หมดเวลาการใช้งานเนื่องจากไม่มีการเคลื่อนไหว');
-      await logoutUser();
-    }, INACTIVITY_LIMIT);
+  if (!session || inactivityLogoutInProgress) return;
+
+  const remaining = INACTIVITY_LIMIT - (Date.now() - lastActivityAt);
+  if (remaining > 0) {
+    inactivityTimer = setTimeout(checkInactivityTimeout, remaining);
+    return;
   }
+
+  inactivityLogoutInProgress = true;
+  await logoutUser({ reason: 'inactivity' });
+  inactivityLogoutInProgress = false;
 }
 
-async function logoutUser() {
+function resetInactivityTimer() {
+  if (!session) return;
+  lastActivityAt = Date.now();
+  sessionStorage.setItem(LAST_ACTIVITY_KEY, String(lastActivityAt));
+  checkInactivityTimeout();
+}
+
+async function logoutUser({ reason = 'manual' } = {}) {
   clearTimeout(inactivityTimer);
   clearInterval(couponTimer);
   cleanupSubscriptions();
@@ -89,15 +104,46 @@ async function logoutUser() {
   session = null;
   currentCoupon = null;
   renderAuth();
+  if (reason === 'inactivity') {
+    showAppDialog('ไม่มีการใช้งานต่อเนื่องเป็นเวลา 15 นาที ระบบได้ออกจากระบบและคืนสถานะผู้ใช้งานแล้ว', {
+      title: 'หมดเวลาการใช้งาน'
+    });
+  }
 }
 
 ['click', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
-  window.addEventListener(event, resetInactivityTimer);
+  window.addEventListener(event, resetInactivityTimer, { passive: true });
 });
+
+// ตอนแอปถูกซ่อนอาจตามด้วยการปัดทิ้ง จึงคืน IsUse ไว้ก่อนด้วยคำขอแบบ keepalive
+// หากเป็นเพียงการสลับแอป เมื่อกลับมาและ Session ยังไม่หมดอายุ จะตั้ง IsUse กลับเป็น true
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'hidden') {
+    releaseUsageOnDisconnect();
+    return;
+  }
+
+  await checkInactivityTimeout();
+  const phone = session?.user?.phone || session?.user?.Phone_No;
+  if (!phone || !window.api?.restoreUserUsage) return;
+  try {
+    await window.api.restoreUserUsage(phone);
+  } catch (error) {
+    console.warn('ไม่สามารถคืนสถานะ IsUse เมื่อกลับเข้าแอป:', error);
+  }
+});
+window.addEventListener('focus', checkInactivityTimeout);
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c]));
 let appDialogTimer = null;
-function showAppDialog(message, { title = 'แจ้งเตือน', autoCloseMs = 0 } = {}) {
+function showAppDialog(message, {
+  title = 'แจ้งเตือน',
+  autoCloseMs = 0,
+  actionLabel = 'ปิด',
+  cancelLabel = '',
+  onAction = null,
+  onCancel = null
+} = {}) {
   clearTimeout(appDialogTimer);
   document.querySelector('#app-message-dialog')?.remove();
   const isInternetError = String(message).includes('เชื่อมต่อ Internet ไม่ได้');
@@ -109,7 +155,10 @@ function showAppDialog(message, { title = 'แจ้งเตือน', autoClo
       <section role="dialog" aria-modal="true" aria-labelledby="app-message-title" style="width:min(100%,360px); padding:22px; border-radius:18px; background:#fffaf4; color:#2c241d; box-shadow:0 20px 45px rgba(0,0,0,.28); text-align:center;">
         <h2 id="app-message-title" style="margin:0 0 10px; font-size:1.2rem; color:#194832;">${esc(title)}</h2>
         <p style="${messageStyle}">${esc(message)}</p>
-        <button id="btn-close-app-message" type="button" style="padding:10px 14px; border:0; border-radius:10px; background:#256b45; color:#fff; font-weight:700;">ปิด</button>
+        <div style="display:flex; justify-content:center; gap:10px;">
+          ${cancelLabel ? `<button id="btn-cancel-app-message" type="button" style="padding:10px 14px; border:0; border-radius:10px; background:#e8efe4; color:#194832; font-weight:700;">${esc(cancelLabel)}</button>` : ''}
+          <button id="btn-close-app-message" type="button" style="padding:10px 14px; border:0; border-radius:10px; background:#256b45; color:#fff; font-weight:700;">${esc(actionLabel)}</button>
+        </div>
       </section><style>@keyframes internet-blink { 50% { opacity:.18; } }</style>
     </div>`);
   const dialog = document.querySelector('#app-message-dialog');
@@ -117,10 +166,30 @@ function showAppDialog(message, { title = 'แจ้งเตือน', autoClo
     clearTimeout(appDialogTimer);
     dialog?.remove();
   };
-  document.querySelector('#btn-close-app-message').onclick = close;
+  document.querySelector('#btn-close-app-message').onclick = () => {
+    close();
+    onAction?.();
+  };
+  document.querySelector('#btn-cancel-app-message')?.addEventListener('click', () => {
+    close();
+    onCancel?.();
+  });
   if (autoCloseMs > 0) appDialogTimer = setTimeout(close, autoCloseMs);
 }
-const showToast = text => showAppDialog(text, { autoCloseMs: 3000 });
+function showConfirmDialog(message, {
+  title = 'ยืนยันรายการ',
+  confirmLabel = 'ยืนยัน',
+  cancelLabel = 'ยกเลิก'
+} = {}) {
+  return new Promise(resolve => showAppDialog(message, {
+    title,
+    actionLabel: confirmLabel,
+    cancelLabel,
+    onAction: () => resolve(true),
+    onCancel: () => resolve(false)
+  }));
+}
+const showToast = (text, title = 'แจ้งเตือน') => showAppDialog(text, { title, autoCloseMs: 3000 });
 window.alert = message => showAppDialog(message, { title: 'แจ้งเตือน' });
 window.addEventListener('offline', () => showAppDialog('เชื่อมต่อ Internet ไม่ได้ กรุณาตรวจสอบหรือเชื่อมต่อ Internet แล้วลองอีกครั้ง', { title: 'Internet' }));
 window.addEventListener('online', async () => {
@@ -135,7 +204,11 @@ window.addEventListener('online', async () => {
     console.warn('ไม่สามารถคืนสถานะ IsUse หลังเชื่อมต่อ Internet:', error);
   }
 });
-const saveSession = value => { session = value; sessionStorage.setItem('benefit-session', JSON.stringify(value)); resetInactivityTimer(); };
+const saveSession = value => {
+  session = value;
+  sessionStorage.setItem('benefit-session', JSON.stringify(value));
+  resetInactivityTimer();
+};
 const buttonLoading = (button, on) => { button.disabled = on; button.dataset.label ||= button.innerHTML; button.innerHTML = on ? '<span class="spinner"></span> กรุณารอสักครู่' : button.dataset.label; };
 
 let installGuideShown = false;
@@ -233,7 +306,11 @@ function layout(content, back = false) {
   </section>`;
   
   document.querySelector('#back')?.addEventListener('click', async () => {
-    if (currentView === 'coupon' && !confirm('ต้องการยกเลิกการแสดง QR และกลับไปหน้าเลือกสินค้าหรือไม่?')) {
+    if (currentView === 'coupon' && !await showConfirmDialog('ต้องการยกเลิกการแสดง QR และกลับไปหน้าเลือกสินค้าหรือไม่?', {
+      title: 'ยกเลิกคูปอง',
+      confirmLabel: 'ยืนยันกลับ',
+      cancelLabel: 'แสดง QR ต่อ'
+    })) {
       return;
     }
     if (['confirm', 'coupon', 'history'].includes(currentView)) {
@@ -250,7 +327,11 @@ function layout(content, back = false) {
   });
 
   document.querySelector('#logout')?.addEventListener('click', async () => {
-    if (confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) await logoutUser();
+    if (await showConfirmDialog('คุณต้องการออกจากระบบใช่หรือไม่?', {
+      title: 'ออกจากระบบ',
+      confirmLabel: 'ออกจากระบบ',
+      cancelLabel: 'ยกเลิก'
+    })) await logoutUser();
   });
 }
 
@@ -435,7 +516,7 @@ async function renderProducts() {
 
     document.querySelectorAll('.product').forEach(el => el.onclick = () => {
       if (usedToday) {
-        alert('⚠️ วันนี้คุณได้ใช้สิทธิ์ไปแล้ว ไม่สามารถใช้ซ้ำได้');
+        showAppDialog('วันนี้คุณได้ใช้สิทธิ์ไปแล้ว ไม่สามารถใช้ซ้ำได้', { title: 'ไม่สามารถใช้สิทธิ์ได้' });
         return;
       }
       renderConfirm(products.find(p => p.id === el.dataset.id));
@@ -668,6 +749,7 @@ function renderSuccessView() {
 
 // เริ่มต้นแอป
 if (session) {
+  checkInactivityTimeout();
   if (session.user?.isDefaultPassword) {
     renderForceChangePassword();
   } else {
